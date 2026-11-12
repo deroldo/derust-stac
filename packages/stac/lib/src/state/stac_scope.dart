@@ -204,6 +204,10 @@ class StacScope implements StacEvalContext {
 
   StacEvalContext get evalContext => this;
 
+  /// Whether [root] is a lexical variable (`item`, `params`, ...) rather than
+  /// a state key.
+  bool isLocal(String root) => _locals.containsKey(root);
+
   /// Store keys (`k`, `global.k`) the [dependencies] refer to.
   List<Listenable> listenablesFor(Set<String> dependencies) {
     final result = <Listenable>[];

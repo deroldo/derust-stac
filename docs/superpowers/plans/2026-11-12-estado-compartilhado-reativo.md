@@ -199,7 +199,7 @@ Future<T> runWithStacActionVars<T>(Map<String, Object?> vars, FutureOr<T> Functi
 
 ---
 
-### Task 4: Camada de binding, widget reativo, envelope e execucao de actions
+### Task 4: Camada de binding, widget reativo, envelope e execucao de actions [CONCLUIDA]
 
 **Dificuldade:** complexo (nucleo do plano). **Depende de:** T3.
 

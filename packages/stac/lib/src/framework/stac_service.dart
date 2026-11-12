@@ -19,6 +19,10 @@ import 'package:stac/src/parsers/widgets/stac_row/stac_row_parser.dart';
 import 'package:stac/src/parsers/widgets/stac_text/stac_text_parser.dart';
 import 'package:stac/src/parsers/widgets/stac_tool_tip/stac_tool_tip_parser.dart';
 import 'package:stac/src/services/stac_network_service.dart';
+import 'package:stac/src/state/stac_binding.dart';
+import 'package:stac/src/state/stac_envelope.dart';
+import 'package:stac/src/state/stac_reactive.dart';
+import 'package:stac/src/state/stac_scope.dart';
 import 'package:stac/src/utils/variable_resolver.dart';
 import 'package:stac_core/stac_core.dart';
 import 'package:stac_framework/stac_framework.dart';
@@ -236,33 +240,102 @@ class StacService {
       }
 
       // Resolve variables in JSON (skip for setValue to avoid recursion)
-      final resolvedJson = widgetType == WidgetType.setValue.name
+      final Map<String, dynamic> resolvedJson =
+          widgetType == WidgetType.setValue.name
           ? json
           : resolveVariablesInJson(json, StacRegistry.instance);
 
-      final model = stacParser.getModel(resolvedJson);
-      return stacParser.parse(context, model);
+      return _buildWidget(context, stacParser, widgetType, resolvedJson);
     } catch (e, stackTrace) {
-      // Log error with full context
-      _logError(
-        category: 'Widget Parse Error',
+      return _onWidgetError(
+        context: context,
         type: json?['type']?.toString(),
+        json: json,
         error: e,
         stackTrace: stackTrace,
       );
+    }
+  }
 
-      // Return error widget if enabled (debug-only)
-      if (_showErrorWidgets && kDebugMode) {
-        return _buildErrorWidget(
-          context: context,
-          error: StacError(
-            type: json?['type']?.toString(),
-            error: e,
-            json: json,
-            stackTrace: stackTrace,
-          ),
-        );
-      }
+  /// Applies the state layer (`bind`, bindings, `visible`, `enabled`) on top
+  /// of the regular parse. JSON without any of it takes the plain path.
+  static Widget? _buildWidget(
+    BuildContext context,
+    StacParser parser,
+    String type,
+    Map<String, dynamic> json,
+  ) {
+    var effective = json;
+    if (StacEnvelope.hasEnvelopeKeys(effective)) {
+      effective = StacEnvelope.rewriteBind(effective, type);
+    }
+    if (StacBinding.hasBindings(effective, isAction: false)) {
+      return StacReactive(
+        json: effective,
+        build: (context, resolved) {
+          try {
+            return _parseWidget(
+                  context,
+                  parser,
+                  type,
+                  StacEnvelope.coerceResolved(resolved, type),
+                ) ??
+                const SizedBox.shrink();
+          } catch (e, stackTrace) {
+            return _onWidgetError(
+                  context: context,
+                  type: type,
+                  json: effective,
+                  error: e,
+                  stackTrace: stackTrace,
+                ) ??
+                const SizedBox.shrink();
+          }
+        },
+      );
+    }
+    return _parseWidget(context, parser, type, effective);
+  }
+
+  /// `visible`/`enabled` envelope, then the type's own `getModel`/`parse`.
+  static Widget? _parseWidget(
+    BuildContext context,
+    StacParser parser,
+    String type,
+    Map<String, dynamic> json,
+  ) {
+    final applied = StacEnvelope.apply(json, type);
+    if (applied == null) return const SizedBox.shrink();
+    final model = parser.getModel(applied);
+    return parser.parse(context, model);
+  }
+
+  static Widget? _onWidgetError({
+    required BuildContext context,
+    required String? type,
+    required Map<String, dynamic>? json,
+    required Object error,
+    required StackTrace stackTrace,
+  }) {
+    // Log error with full context
+    _logError(
+      category: 'Widget Parse Error',
+      type: type,
+      error: error,
+      stackTrace: stackTrace,
+    );
+
+    // Return error widget if enabled (debug-only)
+    if (_showErrorWidgets && kDebugMode) {
+      return _buildErrorWidget(
+        context: context,
+        error: StacError(
+          type: type,
+          error: error,
+          json: json,
+          stackTrace: stackTrace,
+        ),
+      );
     }
     return null;
   }
@@ -273,54 +346,21 @@ class StacService {
   }) {
     try {
       final widgetType = widget.type;
-      final stacParser = StacRegistry.instance.getParser(widgetType);
-
-      if (stacParser == null) {
-        Log.w('Widget type [$widgetType] not supported');
-
-        // Return error widget if enabled (debug-only)
-        if (_showErrorWidgets && kDebugMode) {
-          return _buildErrorWidget(
-            context: context,
-            error: StacError(
-              type: widgetType,
-              error: Exception(_errorWidgetTypeNotSupported),
-              json: widget.toJson(),
-            ),
-          );
-        }
-        return null;
-      }
-
-      // Resolve variables in JSON (skip for setValue to avoid recursion)
-      final resolvedJson = widgetType == WidgetType.setValue.name
-          ? widget.toJson()
-          : resolveVariablesInJson(widget.toJson(), StacRegistry.instance);
-
-      final model = stacParser.getModel(resolvedJson);
-      return stacParser.parse(context, model);
+      final json = widget.toJson();
+      // Same path as fromJson (bindings, envelope, error handling).
+      return fromJson(
+        json['type'] == null ? {...json, 'type': widgetType} : json,
+        context,
+      );
     } catch (e, stackTrace) {
-      _logError(
-        category: 'Widget Parse Error',
-        type: widget.type,
+      return _onWidgetError(
+        context: context,
+        type: null,
+        json: null,
         error: e,
         stackTrace: stackTrace,
       );
-
-      // Return error widget if enabled (debug-only)
-      if (_showErrorWidgets && kDebugMode) {
-        return _buildErrorWidget(
-          context: context,
-          error: StacError(
-            type: widget.type,
-            error: e,
-            json: widget.toJson(),
-            stackTrace: stackTrace,
-          ),
-        );
-      }
     }
-    return null;
   }
 
   static FutureOr<dynamic> onCallFromJson(
@@ -361,7 +401,12 @@ class StacService {
         return null;
       }
 
-      final model = stacActionParser.getModel(json);
+      final resolvedJson = _resolveActionJson(json, actionType, context);
+      if (resolvedJson == null) {
+        return null;
+      }
+
+      final model = stacActionParser.getModel(resolvedJson);
       return stacActionParser.onCall(context, model);
     } catch (e, stackTrace) {
       _logError(
@@ -372,6 +417,38 @@ class StacService {
       );
     }
     return null;
+  }
+
+  /// Evaluates `condition` and resolves the bindings of an action at the
+  /// moment it runs. Returns [json] itself when it has neither, and `null`
+  /// when the action must not run (false or invalid `condition`, D6).
+  static Map<String, dynamic>? _resolveActionJson(
+    Map<String, dynamic> json,
+    String actionType,
+    BuildContext context,
+  ) {
+    final hasCondition = json.containsKey('condition');
+    if (!hasCondition && !StacBinding.hasBindings(json, isAction: true)) {
+      return json;
+    }
+    if (!context.mounted) {
+      Log.w('Action [$actionType] skipped: its widget is no longer mounted');
+      return null;
+    }
+    final scope = StacScope.of(context);
+    var effective = json;
+    if (hasCondition) {
+      if (!StacBinding.asBool(json['condition'], scope, 'condition')) {
+        return null;
+      }
+      effective = Map<String, dynamic>.of(json)..remove('condition');
+    }
+    if (StacBinding.hasBindings(effective, isAction: true)) {
+      effective =
+          StacBinding.resolve(effective, scope, isAction: true)
+              as Map<String, dynamic>;
+    }
+    return effective;
   }
 
   static Widget fromNetwork({
