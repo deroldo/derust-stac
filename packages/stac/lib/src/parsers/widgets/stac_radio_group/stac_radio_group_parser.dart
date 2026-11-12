@@ -1,5 +1,6 @@
+import 'package:stac/src/state/stac_action_vars.dart';
 import 'package:flutter/widgets.dart';
-import 'package:stac/src/parsers/core/stac_action_parser.dart';
+import 'package:stac/src/framework/stac.dart';
 import 'package:stac/src/parsers/core/stac_widget_parser.dart';
 import 'package:stac/src/parsers/widgets/stac_form/stac_form_scope.dart';
 import 'package:stac_core/stac_core.dart';
@@ -72,7 +73,9 @@ class _RadioGroupWidgetState extends State<_RadioGroupWidget> {
 
     // Call the onChanged action if provided
     if (widget.model.onChanged != null) {
-      widget.model.onChanged!.parse(context);
+      runWithStacActionVars({
+        'event': {'value': value},
+      }, () => Stac.onCallFromJson(widget.model.onChanged!.toJson(), context));
     }
   }
 

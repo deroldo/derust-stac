@@ -1,5 +1,7 @@
+import 'package:stac/src/state/stac_action_vars.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:stac/src/framework/stac.dart';
 import 'package:stac/src/parsers/core/stac_action_parser.dart';
 import 'package:stac/src/parsers/foundation/interaction/stac_mouse_cursor_parser.dart';
 import 'package:stac/src/parsers/foundation/interaction/stac_slider_interaction_parser.dart';
@@ -62,7 +64,12 @@ class __StacSliderState extends State<_StacSlider> {
     if (widget.model.id != null) {
       widget.formScope?.formData[widget.model.id!] = value;
     }
-    widget.model.onChanged?.parse(context);
+    final onChanged = widget.model.onChanged;
+    if (onChanged != null) {
+      runWithStacActionVars({
+        'event': {'value': value},
+      }, () => Stac.onCallFromJson(onChanged.toJson(), context));
+    }
 
     setState(() {});
   }

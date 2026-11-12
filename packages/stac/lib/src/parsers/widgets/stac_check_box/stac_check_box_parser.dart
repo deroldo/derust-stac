@@ -1,3 +1,4 @@
+import 'package:stac/src/state/stac_action_vars.dart';
 import 'package:flutter/material.dart';
 import 'package:stac/src/framework/stac.dart';
 import 'package:stac/src/parsers/foundation/interaction/stac_mouse_cursor_parser.dart';
@@ -70,7 +71,13 @@ class _StacCheckBoxState extends State<_StacCheckBox> {
           widget.formScope?.formData[widget.model.id!] = value;
         }
         if (widget.model.onChanged != null) {
-          Stac.onCallFromJson(widget.model.onChanged!.toJson(), context);
+          runWithStacActionVars(
+            {
+              'event': {'value': _currentValue},
+            },
+            () =>
+                Stac.onCallFromJson(widget.model.onChanged!.toJson(), context),
+          );
         }
       },
       mouseCursor: widget.model.mouseCursor?.parse,

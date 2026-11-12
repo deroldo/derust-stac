@@ -62,7 +62,12 @@ class _SwitchWidgetState extends State<_SwitchWidget> {
   /// Change the value of the switch as the user toggles it.
   void _onChanged(bool value) {
     isSelected = value;
-    widget.model.onChanged?.parse(context);
+    final onChanged = widget.model.onChanged;
+    if (onChanged != null) {
+      runWithStacActionVars({
+        'event': {'value': value},
+      }, () => Stac.onCallFromJson(onChanged.toJson(), context));
+    }
     setState(() {});
   }
 
