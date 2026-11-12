@@ -14,7 +14,7 @@ The `StacDecrementStateAction` subtracts `by` (default `1`) from a numeric [stat
 | min      | `num`    | Lower bound, inclusive. Optional. Accepts a binding.                     |
 | max      | `num`    | Upper bound, inclusive. Optional. Accepts a binding.                     |
 
-If the key does not hold a number, or `by` is not a number, the action logs an error and changes nothing. The bounds clamp the result only: they do not stop the action from running, and a value that was already outside the range is moved to the nearest bound. The opposite action is [incrementState](/actions/increment_state).
+If the key does not hold a number, or `by` is not a number, the action logs an error and changes nothing. A `by` that resolves to `null` (for example a binding to a missing key) counts as the default `1`. A `min` or `max` that is not a number is ignored. The bounds clamp the result only: they do not stop the action from running, and a value that was already outside the range is moved to the nearest bound. The opposite action is [incrementState](/actions/increment_state).
 
 ## Example
 

@@ -17,6 +17,7 @@ const List<String> docsExamplePages = [
   'docs/concepts/state.mdx',
   'docs/concepts/bindings_and_expressions.mdx',
   'docs/concepts/reactivity.mdx',
+  'docs/concepts/state_reference.mdx',
   'docs/actions/set_state.mdx',
   'docs/actions/increment_state.mdx',
   'docs/actions/decrement_state.mdx',

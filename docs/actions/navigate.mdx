@@ -104,7 +104,7 @@ Controls how the navigation is performed: push, pop, replace, or clear stack. Wh
 Data returned to the previous route when the current route is removed. It may be a map, a list, a number, text, a `bool`, `null` or a binding, and bindings inside it are resolved when the action runs (in the screen that pops).
 
 - **`pop`**: passed as the second argument to `Navigator.pop(context, result)`.
-- **`pushReplacement`** / **`pushReplacementNamed`**: passed as the `result` to the replacement call so the previous route receives it when the new route is later popped.
+- **`pushReplacement`** / **`pushReplacementNamed`**: passed as the `result` of the route being replaced, so whoever opened the replaced route receives it right away (its `onResult` runs), not when the new route is popped.
 
 The runtime tells "a result was given" apart from "no result" by whether the `result` key is present in the JSON. `"result": null` is a result (it runs `onResult` with `result` equal to `null`); omitting the key is not.
 

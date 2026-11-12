@@ -493,7 +493,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 20: Fase 7 — fechamento da documentacao
+### Task 20: Fase 7 — fechamento da documentacao [CONCLUIDA]
 
 **Dificuldade:** medio. **Depende de:** todas.
 

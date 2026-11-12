@@ -1,0 +1,577 @@
+---
+title: "State Reference"
+description: "Complete JSON contract of shared reactive state: every property, action, variable, fallback and limitation"
+---
+
+This page is the contract a backend needs to emit state-driven screens. It lists every field, its type, whether it is required, its default, what it accepts, what happens when it is wrong, and the order things are evaluated in. For a guided introduction read [State](/concepts/state), [Bindings and Expressions](/concepts/bindings_and_expressions) and [Reactivity](/concepts/reactivity) first.
+
+Conventions used below:
+
+- Actions are identified by `actionType`; widgets by `type`.
+- "Binding" means a map with exactly one key, `$state` or `$expr`, whose value is text (see [Bindings](#bindings)).
+- Nothing on this page ever throws at runtime. Problems are logged and fall back as described in [Errors and fallbacks](#errors-and-fallbacks).
+
+## Evaluation order
+
+For a **widget** (any JSON with a `type`):
+
+1. Legacy `{{var}}` placeholders are filled (`setValue` mechanism, unrelated to state).
+2. If the JSON has `state`, `globalState` or `onInit`, a [screen scope](#screen-scope) is created for it and those three keys are removed from the widget itself.
+3. `bind` is rewritten into a value binding plus a change action ([bind](#bind)).
+4. Bindings in the widget's **own** JSON are resolved against the current scope. Nested widgets and nested actions are left alone and resolve themselves.
+5. `visible` and `enabled` are applied (strict `bool`).
+6. The widget's own parser runs on the resolved JSON.
+
+When a key read by a binding changes, steps 4 to 6 run again for that widget only.
+
+For an **action** (any JSON with an `actionType`), at the moment it runs:
+
+1. `condition` is evaluated. A result that is not exactly `true` skips the whole action.
+2. Every binding in the action is resolved, all together, before anything is written.
+3. The action runs. Follow-up actions (`onSuccess`, `onResult`, items of a `multiAction`, ...) repeat this sequence when their turn comes.
+
+## Bindings
+
+| Form                        | Meaning                                                                       |
+|-----------------------------|-------------------------------------------------------------------------------|
+| `{ "$state": "path" }`      | Reads a path: `total`, `user.name`, `items[0]`, `global.token`, `item.id`.    |
+| `{ "$expr": "expression" }` | Evaluates an [expression](#expression-grammar).                               |
+
+- A map is a binding only when it has **exactly one** key and the value is text. `{ "$state": "a", "other": 1 }` is plain data.
+- `$state` accepts only a path: identifiers, `.field` and literal `[index]` (`a.b[0]`). Anything else (`a + 1`, `a[b]`) logs a warning and evaluates to `null`; use `$expr`.
+- A binding may sit in any property of a widget's own JSON, at any depth, except inside nested widgets and nested actions (they own their bindings).
+- In an action, the keys `values`, `value`, `result`, `params`, `body`, `queryParameters`, `headers` and `initial` are data: every binding below them, at any depth, is resolved, even inside maps that look like widgets or actions.
+- Dart DSL: `StacBinding.state('path')` and `StacBinding.expr('expression')` produce these maps.
+
+```json
+{
+  "type": "column",
+  "state": { "price": 4, "qty": 3, "user": { "name": "Ana" } },
+  "children": [
+    { "type": "text", "data": { "$state": "user.name" } },
+    { "type": "text", "data": { "$expr": "'Total: ' + price * qty" } }
+  ]
+}
+```
+
+## Expression grammar
+
+Expressions are parsed by a closed interpreter. There is no way to run code, call arbitrary functions or write state from an expression.
+
+```text
+expression     = ternary
+ternary        = or [ "?" ternary ":" ternary ]
+or             = and { "||" and }
+and            = equality { "&&" equality }
+equality       = comparison { ( "==" | "!=" ) comparison }
+comparison     = additive { ( "<" | "<=" | ">" | ">=" ) additive }
+additive       = multiplicative { ( "+" | "-" ) multiplicative }
+multiplicative = unary { ( "*" | "/" | "%" ) unary }
+unary          = ( "!" | "-" ) unary | postfix
+postfix        = primary { "." IDENT | "[" expression "]" }
+primary        = NUMBER | STRING | "true" | "false" | "null"
+               | IDENT | IDENT "(" [ expression { "," expression } ] ")"
+               | "(" expression ")"
+```
+
+Lexical rules:
+
+- `IDENT` is `[A-Za-z_][A-Za-z0-9_]*`. Keys with `-`, `$`, spaces or non-ASCII letters cannot be referenced by name.
+- `NUMBER` is digits with an optional `.digits` part (`3`, `2.5`). There is no sign (use unary `-`), no exponent and no leading dot.
+- `STRING` uses single or double quotes. Escapes: `\n`, `\t`, `\r`; any other `\x` yields `x` (so `\'` and `\\` work). An unterminated string is a syntax error.
+- Whitespace (space, tab, newline) between tokens is ignored.
+
+### Precedence
+
+From the loosest to the tightest binding. All binary operators are left associative; the ternary is right associative.
+
+| Level | Operators                  | Operands and result                                                                   |
+|-------|----------------------------|---------------------------------------------------------------------------------------|
+| 1     | `a ? b : c`                | `a` must be a `bool`, otherwise the whole expression is `null`. Only the taken branch is evaluated. |
+| 2     | `\|\|`                     | Both sides must be `bool`. Short-circuits.                                            |
+| 3     | `&&`                       | Both sides must be `bool`. Short-circuits.                                            |
+| 4     | `==` `!=`                  | Any types. No coercion: `3 != "3"`. Lists and objects compare deeply. `null == null` is `true`. |
+| 5     | `<` `<=` `>` `>=`          | Numbers only.                                                                         |
+| 6     | `+` `-`                    | Numbers; `+` also concatenates when either side is text.                              |
+| 7     | `*` `/` `%`                | Numbers only. `/` always yields a decimal number (`10 / 2` is `5.0`). `%` is never negative. |
+| 8     | `!` `-` (unary)            | `!` needs a `bool`; `-` needs a number.                                               |
+| 9     | `.field` `[index]` `f(...)` `( ... )` | `.field` reads an object field. `[i]` takes an integer index on a list or a text key on an object. |
+
+Short-circuit means the right side is not evaluated when the left side decides the result (`false && x`, `true || x`). An operand that is not a `bool` on the left of `&&` or `||` makes the result `null`.
+
+A list index must be an integer value. The result of `/` is a decimal number and is **not** accepted as an index (`items[n / 2]` is `null`); build the index with `+`, `-`, `*` or `%` on integers. An index out of range, a missing field or any access on `null` is `null`.
+
+### Functions
+
+The set is closed. An unknown name, or a wrong number of arguments, is a syntax error: the binding evaluates to `null` and a warning is logged.
+
+| Function                             | Arguments | Result                                                                                   |
+|--------------------------------------|-----------|------------------------------------------------------------------------------------------|
+| `length(x)`                          | 1         | Characters of a text, items of a list. `length(null)` is `0`. Any other type: `null` + warning. |
+| `trim(text)`                         | 1         | Text without surrounding whitespace. `trim(null)` is `""`. Non-text: `null` + warning.   |
+| `contains(list, value)`              | 2         | `true` if some item equals `value` (deep equality). `contains(null, v)` is `false`. A non-list: `null` + warning. |
+| `contains(list, object, "field")`    | 3         | `true` if some item of `list` is an object whose `field` equals `object.field`. `object` must be an object and `"field"` text, otherwise `null` + warning. |
+
+### Concatenation and number printing
+
+If either side of `+` is text, the result is text and the other side must be text, a number or a `bool`. A number with no fractional part prints without `.0` (`'n=' + 10 / 2` is `n=5`); a `bool` prints `true` or `false`. `null`, lists and objects are invalid operands: the expression is `null`, with a warning. If neither side is text, `+` needs two numbers.
+
+## Variables and namespaces
+
+The first name of a path is resolved in this order (innermost wins):
+
+1. A local variable of the place where the binding is evaluated.
+2. `global`, the read-only view of the global store (`global.token`).
+3. A key of the nearest screen state.
+
+| Name          | Where it exists                                                                                       | Value                                                                                          |
+|---------------|-------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `global`      | Everywhere.                                                                                           | `global.<key>` reads a key declared in `globalState`. Undeclared: `null`.                      |
+| `params`      | The whole destination screen of a `navigate` that sent `params`, including its initial `state`.       | A deep copy of the values resolved when the `navigate` ran. Not a state key.                   |
+| `result`      | The `onResult` action of a `navigate`, and the actions it runs.                                       | The value the closed screen popped with (may be `null` if it popped `"result": null`).         |
+| `response`    | `onSuccess`, `onError`, `onFinally` of a `networkRequest`, and the actions they run.                  | `{ body, statusCode, headers }`. `statusCode` is `null` and `body` is `null` when there was no response. |
+| `event`       | The action of an input's change callback (`onChanged`, `onSelected`), and the actions it runs.        | `{ value }`: `bool` for `checkBox` and `switch`, `double` for `slider`, the chosen `value` for `radioGroup` and `dropdownMenu`, the typed text for `textField` and `textFormField`. |
+| `item`, `index` | The `itemTemplate` of `listView`, `gridView`, `pageView`, `sliverList`, `sliverGrid`, and the actions it triggers. | The entry and its 0-based position. Rename with `as` and `indexAs`. |
+
+`global`, `params`, `result`, `response` and `event` are reserved: they cannot be declared as screen keys (error logged, key skipped). `item` and `index` are not reserved, but a screen key with that name is hidden inside a template; use `as` / `indexAs`. An unknown name reads as `null`.
+
+Dependencies for [reactivity](/concepts/reactivity) are collected per top-level key: `total` for `total.x`, and `global.token` for `global.token.x`. Reading a global key through an index (`global['token']`) is not tracked, so write `global.token`. Local variables are never keys and are not tracked as state.
+
+## Screen scope
+
+`state`, `globalState` and `onInit` are read from the JSON of **any widget**. That widget owns a screen scope for its whole subtree.
+
+| Property      | Type                                  | Required | Default | Description |
+|---------------|---------------------------------------|----------|---------|-------------|
+| `state`       | object                                | No       | none    | Screen keys: key name to initial value (any JSON, may contain bindings over `params` and `global`). |
+| `globalState` | object                                | No       | none    | Global keys; see [globalState](#globalstate). Declared before `state`, so `state` values can read them. |
+| `onInit`      | action, or list of actions            | No       | none    | Runs once after the first frame. A list is a `multiAction` with `sync: true`. |
+
+Rules:
+
+- `state` and `globalState` must be objects. Any other type is logged and ignored.
+- Initial `state` values are resolved once, when the scope is created. Bindings inside them are evaluated with `params` and `global`.
+- A key must be declared before it is written. Reading an undeclared key gives `null`; writing one logs an error and writes nothing.
+- Stored lists and objects are immutable deep copies. Change them by writing a new value.
+- A screen key written with a scalar equal to its current value does not notify; a list or object always notifies. Several keys written by one action notify once.
+- The scope is identified by the content of the `state`, `globalState` and `onInit` blocks. The same JSON re-rendered (theme switch, parent rebuild) keeps the values and does not run `onInit` again; different blocks, or a new server response for a screen, create a new scope and run `onInit` again.
+- When the screen is removed, its state is disposed and its in-flight requests are cancelled.
+- A nested widget with its own `state` creates an inner scope that **replaces** the outer one for its subtree: keys of the outer scope are not readable or writable from inside it (see [v1 limitations](#v1-limitations)). `global` stays reachable.
+- `onInit` that is neither an action nor a list is logged and skipped.
+
+### globalState
+
+Each entry is the initial value itself, or a declaration object when it contains `initial` and nothing but `initial`, `persist` and `secure`.
+
+| Property  | Type   | Required | Default | Description |
+|-----------|--------|----------|---------|-------------|
+| `initial` | any    | Yes (in the object form) | none | Initial value. |
+| `persist` | `bool` | No       | `false` | Keep the value across app launches. |
+| `secure`  | `bool` | No       | `false` | Keep the value in the platform secure storage. Implies `persist`; `persist: false` is ignored with a warning. |
+
+- Declaration is idempotent: a key that already exists keeps its value and its original flags.
+- Value on declaration: memory (already set this session), else the persisted copy (if valid and of the same JSON type as `initial`; `null` accepts any type), else `initial`.
+- `persist` / `secure` on a screen key is ignored with a warning.
+- Values must be JSON to be saved. Storage errors are logged and never break the screen.
+- Secure values are replaced by `***` (by text substitution) in diagnostics, are left out of `bodyFromState`, and on web are not saved. See [State](/concepts/state#secure-values).
+
+```json
+{
+  "type": "column",
+  "globalState": {
+    "userName": "Ana",
+    "theme": { "initial": "light", "persist": true },
+    "token": { "initial": "", "secure": true }
+  },
+  "state": {
+    "total": 0,
+    "ready": false,
+    "greeting": { "$expr": "'Hi ' + global.userName" }
+  },
+  "onInit": [
+    { "actionType": "setState", "values": { "ready": true } },
+    { "actionType": "incrementState", "key": "total", "by": 10 }
+  ],
+  "children": [
+    { "type": "text", "data": { "$state": "greeting" } },
+    { "type": "text", "data": { "$expr": "'Total: ' + total" }, "visible": { "$state": "ready" } }
+  ]
+}
+```
+
+## Envelope properties
+
+These keys are accepted by every widget and are handled before the widget's own parser.
+
+### visible
+
+| Type | Required | Default | Accepts |
+|------|----------|---------|---------|
+| `bool` or binding | No | shown | A `bool`, or a binding that resolves to a `bool`. |
+
+`false` builds nothing (an empty box). Anything that is not a real `bool` (text, number, `null`, invalid expression, missing key) counts as `false` and logs a warning. For `visibility` and `sliverVisibility`, `visible` is their native property; it receives the resolved `bool` and keeps its usual meaning.
+
+### enabled
+
+| Type | Required | Default | Accepts |
+|------|----------|---------|---------|
+| `bool` or binding | No | enabled | Same strict `bool` rule as `visible`. |
+
+Widgets with a native `enabled` receive the resolved value. For `elevatedButton`, `filledButton`, `outlinedButton`, `textButton`, `iconButton`, `floatingActionButton`, `inkWell`, `gestureDetector`, `chip`, `checkBox`, `switch` and `slider`, `enabled: false` removes the touch actions `onPressed`, `onTap`, `onLongPress`, `onDoubleTap`, `onChanged`, `onChangeEnd`, `onSelected` and `onDeleted`; `checkBox`, `switch` and `slider` are also made non-interactive and dimmed. Any other widget ignores `enabled`.
+
+### bind
+
+| Type | Required | Default | Accepts |
+|------|----------|---------|---------|
+| `String` | No | none | A non-empty screen key name (or `global.<key>`). |
+
+`bind: "k"` connects an input to key `k` in both directions. The runtime rewrites the widget before building it:
+
+| Widget                         | Value property set to `{ "$state": "k" }` | Change callback that writes `k` |
+|--------------------------------|--------------------------------------------|---------------------------------|
+| `checkBox`, `switch`, `slider` | `value`                                    | `onChanged`                     |
+| `radioGroup`                   | `groupValue`                               | `onChanged`                     |
+| `textField`, `textFormField`   | `initialValue`                             | `onChanged`                     |
+| `dropdownMenu`                 | `initialSelection`                         | `onSelected`                    |
+
+The callback becomes a `multiAction` with `sync: true`: first `setState` with `{ "k": { "$state": "event.value" } }`, then the callback you wrote (if any). The key is therefore already updated when your own callback runs. Rules and errors:
+
+- `bind` on a `radio` is an error (put it on the `radioGroup`); on any other widget it is ignored with a warning; an empty or non-text `bind` is an error and ignored.
+- The bound value property is overwritten: do not also write `value` / `groupValue` / `initialValue` / `initialSelection`.
+- A number or `bool` in a text input's key is shown as text; `null` shows empty text. Typing never resets the cursor: the field text is replaced only when it differs from the key.
+- Writing the key from somewhere else updates the input without firing its callback.
+
+### condition (actions)
+
+| Type | Required | Default | Accepts |
+|------|----------|---------|---------|
+| `bool` or binding | No | runs | Any action. |
+
+Evaluated first, before any other binding of the action. Only exactly `true` lets the action run. `false`, `null`, invalid expressions and non-`bool` values skip the whole action and everything chained to it; non-`bool` results also log a warning. The widget `conditional` takes `condition` too: a binding or a `bool` follows the same strict rule, while a plain `String` keeps the older expression syntax.
+
+### Input change callbacks
+
+`onChanged` (and `onSelected` on `dropdownMenu`) stays a single action; use `multiAction` for several. While it runs, `event.value` holds the new value (types in [Variables and namespaces](#variables-and-namespaces)). `slider.onChangeStart` and `onChangeEnd` receive no `event`.
+
+```json
+{
+  "type": "form",
+  "state": { "name": "", "accepted": false, "saved": false },
+  "child": {
+    "type": "column",
+    "children": [
+      { "type": "textField", "bind": "name" },
+      { "type": "checkBox", "bind": "accepted" },
+      { "type": "text", "data": "Name is too short", "visible": { "$expr": "length(trim(name)) < 3" } },
+      {
+        "type": "elevatedButton",
+        "enabled": { "$expr": "accepted && length(trim(name)) >= 3" },
+        "child": { "type": "text", "data": "Save" },
+        "onPressed": {
+          "actionType": "setState",
+          "condition": { "$expr": "!saved" },
+          "values": { "saved": true }
+        }
+      },
+      { "type": "text", "data": "Saved", "visible": { "$state": "saved" } }
+    ]
+  }
+}
+```
+
+## State actions
+
+Every state action accepts `condition`. `key` accepts the `global.` prefix. All bindings are resolved before the action writes anything. A write to an undeclared key (or reserved name) logs an error and writes nothing.
+
+### setState
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `values` | object | Yes | none | Key to value (or binding). Keys accept `global.`. All keys are written in one batch (one rebuild per widget). |
+
+### incrementState / decrementState
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `key` | `String` | Yes | none | A key holding a number. |
+| `by`  | number or binding | No | `1` | Step. A `by` that resolves to `null` (missing key) is treated as `1`. |
+| `min` | number or binding | No | none | Inclusive lower bound, applied to the result. |
+| `max` | number or binding | No | none | Inclusive upper bound, applied to the result. |
+
+`new = current + by` (`-` for decrement), then clamped to `min` and `max`; a value already outside the range is moved to the nearest bound. A `min` or `max` that is not a number is ignored. If the key does not hold a number, or `by` is not a number, an error is logged and nothing changes. `min` / `max` clamp only; they never stop the action from running.
+
+### toggleState
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `key` | `String` | Yes | none | A key holding a `bool`. |
+
+Inverts it. Any other value (including `null`) logs an error and changes nothing.
+
+### resetState
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `keys` | `List<String>` | No | all screen keys | Keys to restore to the value they had at declaration (after its bindings were resolved). |
+
+Without `keys`, only the **screen** store is reset. Global keys are reset only when listed (`"global.theme"`); that also erases the persisted copy. Undeclared keys are ignored. All resets are batched.
+
+### appendState
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `key` | `String` | Yes | none | A key holding a list. |
+| `value` | any or binding | No | `null` | Item to add at the end. |
+
+Writes a new list. A key that is not a list logs an error and changes nothing.
+
+### removeFromState
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `key` | `String` | Yes | none | A key holding a list. |
+| `index` | integer or binding | One of `index`/`value` | none | Position to remove (from 0). Wins over `value` when both are present. |
+| `value` | any or binding | One of `index`/`value` | none | Item to remove (deep equality); only the first match. |
+
+Nothing is removed (warning logged) when `index` is not a whole number, is negative or past the end, or when `value` is not found. A key that is not a list is an error.
+
+### toggleItem
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `key` | `String` | Yes | none | A key holding a list. |
+| `value` | any or binding | No | `null` | Item to add or remove. |
+| `by` | `String` | No | none | Field used as identity when items are objects; without it items compare as a whole (deep equality). |
+
+If an equal item (same `by` field) is in the list it is removed, otherwise `value` is appended (the whole value, not just the `by` field). A key that is not a list is an error.
+
+### multiAction
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `actions` | list of actions | Yes | none | Actions to run in order. |
+| `sync` | `bool` | No | `false` | `true`: each action is awaited and resolved on its turn, so it sees what the previous ones wrote. `false`: they start one after another without waiting. |
+
+Use `sync: true` whenever order matters.
+
+```json
+{
+  "type": "column",
+  "state": { "tags": ["red"], "draft": "blue", "total": 5, "flag": false },
+  "children": [
+    { "type": "text", "data": { "$expr": "length(tags) + ' tags, total ' + total" } },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Run" },
+      "onPressed": {
+        "actionType": "multiAction",
+        "sync": true,
+        "actions": [
+          { "actionType": "appendState", "key": "tags", "value": { "$state": "draft" } },
+          { "actionType": "incrementState", "key": "total", "by": 2, "max": 6 },
+          { "actionType": "toggleState", "key": "flag" },
+          { "actionType": "toggleItem", "key": "tags", "value": "red" },
+          { "actionType": "removeFromState", "key": "tags", "value": "none", "condition": { "$expr": "contains(tags, 'none')" } },
+          { "actionType": "resetState", "keys": ["flag"] },
+          { "actionType": "setState", "values": { "draft": "" } }
+        ]
+      }
+    }
+  ]
+}
+```
+
+## networkRequest (state extensions)
+
+The existing properties (`url`, `method`, `queryParameters`, `headers`, `contentType`, `body`, `results`) are unchanged; see [Network Request](/actions/network_request). Added:
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `onStart` | action or list | No | none | Runs before the request leaves. |
+| `onSuccess` | action or list | No | none | Runs when the status is 2xx. |
+| `onError` | action or list | No | none | Runs on a non-2xx status, a connection failure or a timeout. |
+| `onFinally` | action or list | No | none | Runs after `onSuccess` / `onError`. |
+| `requestKey` | `String` | No | none | Names the request on its screen. A newer request with the same key cancels the older one. |
+| `bodyFromState` | `List<String>` | No | none | Keys sent as the body, as `{ "<key as written>": value }`. |
+
+Order: `onStart`; the request; `onSuccess` (2xx) or `onError`; `onFinally`; then the legacy `results` entry for the status code. A list of callbacks runs in order, each awaited. A callback entry that is not an action is logged and skipped.
+
+- `condition`, and the bindings in `url`, `queryParameters`, `headers` and `body`, are evaluated when the action is triggered. Bindings in callbacks are evaluated when each callback runs.
+- `response` (`body`, `statusCode`, `headers`) exists in `onSuccess`, `onError` and `onFinally`. A 2xx answer never goes to `onError`, whatever its body says.
+- Cancellation: starting a request with an existing `requestKey` cancels the previous one at the moment of the call (order of calls decides, not order of answers); [`cancelRequest`](#cancelrequest) cancels explicitly; closing the screen cancels every request it started. A cancelled request runs no further callback and writes nothing.
+- `bodyFromState`: values are read at trigger time. Keys declared `secure` are left out with a warning. An explicit `body` wins over `bodyFromState` (warning).
+
+### cancelRequest
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `requestKey` | `String` | Yes | none | Key of the in-flight request of the current screen to cancel. Unknown keys do nothing. |
+
+```json
+{
+  "type": "column",
+  "state": { "users": [], "loading": false, "failed": false },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "enabled": { "$expr": "!loading" },
+      "child": { "type": "text", "data": "Load" },
+      "onPressed": {
+        "actionType": "networkRequest",
+        "url": "https://example.com/api/users",
+        "method": "get",
+        "requestKey": "users",
+        "onStart": { "actionType": "setState", "values": { "loading": true, "failed": false } },
+        "onSuccess": { "actionType": "setState", "values": { "users": { "$state": "response.body.items" } } },
+        "onError": { "actionType": "setState", "values": { "failed": true } },
+        "onFinally": { "actionType": "setState", "values": { "loading": false } }
+      }
+    },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Cancel" },
+      "onPressed": { "actionType": "cancelRequest", "requestKey": "users" }
+    },
+    { "type": "text", "data": "Could not load", "visible": { "$state": "failed" } },
+    { "type": "text", "data": { "$expr": "length(users) + ' users'" } }
+  ]
+}
+```
+
+## navigate (params, result, pop)
+
+Destination properties (`request`, `widgetJson`, `assetPath`, `routeName`) and `navigationStyle` are unchanged; see [Navigate](/actions/navigate). Added or extended:
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `params` | object | No | none | Values handed to the destination. Resolved when the action runs and deep-copied. Read there as `params.<name>`, including in its initial `state`. |
+| `result` | any JSON or binding | No | absent | Value returned to the origin. Only meaningful with `navigationStyle: pop` (and `pushReplacement*`). The **presence** of the key matters: `"result": null` is a result, omitting the key is not. |
+| `onResult` | action | No | none | Runs on the origin when the pushed route closes **with** a result. `result` holds the value. |
+| `onCancel` | action | No | none | Runs on the origin when the pushed route closes **without** a result (back button, gesture, `pop` with no `result` key). |
+
+- There is no separate `pop` action: use `navigationStyle: pop`. `onResult` and `onCancel` are mutually exclusive.
+- Both run only for styles that push a route, and only while the origin is still on screen; otherwise they are skipped silently. They accept one action (use `multiAction` for several) and may use `result` / their own bindings, evaluated against the origin's state when they run.
+- Whoever awaits `Navigator.push` still receives the plain value (`null` on cancel).
+- `params` with `pushNamed`, `pushReplacementNamed` and `pushNamedAndRemoveAll` cannot become a variable (Stac does not build that screen): they travel inside `arguments` under the key `__stacParams`, and the app's route builder must read them.
+- Dart DSL: `StacNavigateAction.result` is `Object?`; set `hasResult: true` to pop with an explicit `null`.
+
+```json
+{
+  "type": "column",
+  "state": { "product": "Coffee", "picked": [] },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Choose" },
+      "onPressed": {
+        "actionType": "navigate",
+        "navigationStyle": "push",
+        "params": { "name": { "$state": "product" } },
+        "widgetJson": {
+          "type": "column",
+          "state": { "qty": 1 },
+          "children": [
+            { "type": "text", "data": { "$expr": "'Buy ' + params.name" } },
+            {
+              "type": "elevatedButton",
+              "child": { "type": "text", "data": "Confirm" },
+              "onPressed": {
+                "actionType": "navigate",
+                "navigationStyle": "pop",
+                "result": { "name": { "$state": "params.name" }, "qty": { "$state": "qty" } }
+              }
+            }
+          ]
+        },
+        "onResult": { "actionType": "appendState", "key": "picked", "value": { "$state": "result" } },
+        "onCancel": { "actionType": "none" }
+      }
+    },
+    { "type": "text", "data": { "$expr": "length(picked) + ' picked'" } }
+  ]
+}
+```
+
+## List templates
+
+`listView`, `gridView`, `pageView`, `sliverList` and `sliverGrid` accept:
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `items` | list or binding | No | none | Entries to render. `null` renders nothing; any other non-list value renders nothing and logs a warning. |
+| `itemTemplate` | widget | No | none | Widget repeated for each entry. When present it wins over `children`. |
+| `as` | `String` | No | `item` | Variable name for the entry. An empty text uses the default. |
+| `indexAs` | `String` | No | `index` | Variable name for the 0-based position. An empty text uses the default. |
+
+- The list resolves its own `items`; every template instance resolves its own bindings against its own `item` / `index`, and so do the actions inside it. Nested lists see the variables of both levels; use different names to avoid hiding the outer one.
+- Items are built lazily as they scroll into view. A change to the `items` key rebuilds the list.
+- Identity is the position: the widget at position N is rebuilt with whatever entry is now at N.
+- There is no empty-state template: use `visible` on a sibling, for example `length(todos) == 0`.
+- Without `itemTemplate`, `children` work exactly as before.
+
+```json
+{
+  "type": "column",
+  "state": { "todos": [ { "id": 1, "name": "Buy milk" }, { "id": 2, "name": "Walk dog" } ] },
+  "children": [
+    { "type": "text", "data": "Nothing to do", "visible": { "$expr": "length(todos) == 0" } },
+    {
+      "type": "listView",
+      "shrinkWrap": true,
+      "items": { "$state": "todos" },
+      "as": "todo",
+      "indexAs": "i",
+      "itemTemplate": {
+        "type": "listTile",
+        "title": { "type": "text", "data": { "$expr": "(i + 1) + '. ' + todo.name" } },
+        "trailing": {
+          "type": "textButton",
+          "child": { "type": "text", "data": "Done" },
+          "onPressed": { "actionType": "removeFromState", "key": "todos", "index": { "$state": "i" } }
+        }
+      }
+    },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Add" },
+      "onPressed": { "actionType": "appendState", "key": "todos", "value": { "id": 3, "name": "New task" } }
+    }
+  ]
+}
+```
+
+## Errors and fallbacks
+
+Bindings and actions never throw. A problem is logged (secure values are replaced by `***`) and the result is as follows.
+
+| Situation | Result |
+|-----------|--------|
+| Invalid syntax, unknown function, wrong number of arguments | The binding is `null`. |
+| Type error (`'a' < 1`, `!3`, non-`bool` ternary condition, `null` in arithmetic) | The expression is `null`. |
+| Division or modulo by zero | The expression is `null`. |
+| Missing key, field or index; access on `null` | `null`. |
+| `visible`, `enabled`, `condition` not resolving to a real `bool` | Treated as `false`; warning logged. |
+| `data` of `text` / `selectableText` resolving to non-text | `null` is `""`; numbers and `bool` print as in concatenation; lists and objects print as JSON. |
+| Text input value property (`initialValue`) bound to a non-text | Shown as text (`null` is empty). |
+| Any other property receiving `null` | Behaves as if omitted. |
+| Property receiving a value of the wrong type | The widget fails like malformed JSON: error logged, error widget in debug. |
+| Write to an undeclared or reserved key | Error logged, nothing written. |
+| `toggleState` on a non-`bool`; `incrementState`/`decrementState` on a non-number; list actions on a non-list | Error logged, nothing changes. |
+| `removeFromState` with a bad index or a missing value | Warning logged, nothing removed. |
+| Reserved name declared in `state` | Error logged, key skipped. |
+| `bodyFromState` with a `secure` key | Key left out, warning logged. |
+| `secure: true` with `persist: false` | Warning; the key is persisted anyway. |
+| Persisted value of another type than `initial`, or undecodable | Discarded and erased; `initial` is used. |
+| Action whose widget was removed before it ran | Skipped with a warning. |
+
+## v1 limitations
+
+- **Dart DSL covers actions and typed fields only.** `stac_core` has models for every new action and the new typed fields (`StacNetworkRequest.onStart` ..., `StacNavigateAction.params`, `items` / `itemTemplate` / `as` / `indexAs` on lists) plus `StacBinding`. The envelope properties `visible`, `enabled`, `bind`, `state`, `globalState` and `onInit` have no typed field: author them as JSON (`StacWidget(jsonData: ...)`).
+- **`pushNamed` and `params`.** With the Flutter named-route styles, Stac does not build the destination, so `params` is delivered only inside `arguments["__stacParams"]` and the app must read it. Use `routeName` with `push` for Stac screens.
+- **Item identity is the index.** List items are not tracked by an id: inserting or removing in the middle rebuilds the following items with the entry now at their position, and any local widget state (a text being typed, a scroll offset) stays with the position.
+- **Nested `state` does not chain.** An inner `state` block hides all keys of the outer one; reads and writes see only the nearest scope (plus `global` and local variables). Copy what the inner scope needs into `params`, `global` or its own initial values.
+- **Secure masking is text substitution.** Every occurrence of a secure value's text in diagnostics is replaced by `***`, so a short secret hides the same text elsewhere in the output, and a secret that is transformed (for example inside a longer token or encoded) is not recognised.
+- **`separator` is outside the item scope.** The `separator` of a `listView` is built by the list, not per item, so it cannot read `item` or `index`.
+- **Slider `onChangeStart` / `onChangeEnd` have no `event.value`.** Only `onChanged` receives `event`. Read the bound key instead.
+- State is independent from the legacy `setValue` / `{{var}}` / `getFormValue` mechanisms; neither sees the other.
+- Expressions are limited to the grammar above: no assignment, no loops, no user functions, and only `length`, `trim` and `contains`.

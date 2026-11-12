@@ -508,7 +508,7 @@ Rules:
 - **Lazy.** Items are built as they scroll into view, so long lists stay cheap.
 - **Empty list.** There is no empty template. Show a sibling with `visible` instead: `"visible": { "$expr": "length(todos) == 0" }`.
 - **Legacy `children`** keep working exactly as before when `itemTemplate` is absent.
-- **Separator.** `separator` is drawn between template items too.
+- **Separator.** `separator` is drawn between template items too. It belongs to the list, not to an item, so it cannot read `item` or `index`.
 
 ### Example
 

@@ -7,6 +7,21 @@ This page documents the version history of Stac, including new features, breakin
 
 ---
 
+## Unreleased
+
+### Shared reactive state
+- Added screen `state` and `globalState` (with optional `persist` and `secure` keys), `onInit`, and the `$state` / `$expr` bindings with a closed expression language
+- Added the `visible`, `enabled` and `bind` properties to widgets, and `condition` to actions
+- Added the state actions `setState`, `incrementState`, `decrementState`, `toggleState`, `resetState`, `appendState`, `removeFromState` and `toggleItem`
+- Inputs (`checkBox`, `switch`, `slider`, `radioGroup`, `textField`, `textFormField`, `dropdownMenu`) expose `event.value` and can be bound to a key with `bind`
+- `networkRequest` gained `onStart`, `onSuccess`, `onError`, `onFinally`, `requestKey` and `bodyFromState`, exposes `response`, and a new `cancelRequest` action cancels by key
+- `navigate` gained `params`, `result`, `onResult` and `onCancel` to pass values between screens
+- `listView`, `gridView`, `pageView`, `sliverList` and `sliverGrid` render `items` with an `itemTemplate`
+- `conditional.condition` accepts a binding or a `bool`
+- Added the [State Reference](/concepts/state_reference) page with the complete JSON contract
+
+---
+
 ## 1.6.0
 - Added `intrinsicHeight` and `intrinsicWidth` widgets
 - Mapped `cacheExtent` on `listView`, `gridView`, and `customScrollView` to Flutter's `ScrollCacheExtent`

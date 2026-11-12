@@ -189,3 +189,16 @@ State is a separate mechanism and does not replace the older ones:
 - A single widget can mix them: `"data": "{{title}}"` on one widget and `"data": { "$state": "total" }` on another.
 
 Prefer state for anything that must update the UI after the screen is shown; keep `{{var}}` for values known when the screen is rendered.
+
+## Property audit and exceptions
+
+An automated audit checks that bindings really drive the screen. For every widget type that has a playground example, it replaces one scalar property of that widget with `{ "$state": "p" }`, renders it, changes `p`, and compares the result with rendering the literal value directly. The render must match, with no logged error and no exception. The audit proves the mechanism for each widget type; it does not try every property of every widget, because bindings are resolved before the widget's own parser, so the same path serves all of them.
+
+What the audit does **not** cover:
+
+- **Audited by one property per widget type.** The audit exercises one property of each type, not all of them.
+- **`dynamicView`, `networkWidget`, and `dynamicListView` / `refreshIndicator` examples** (the playground examples of `dynamic_view`, `dynamic_list_view` and `refresh_indicator`) are not audited: they fetch their content through Dio, which leaves pending timers in a plain widget test. Bindings in their own JSON follow the same rules as any widget.
+- **`webView`** is not audited either: it needs a platform plugin that does not run in a widget test.
+- **`defaultTabController.length` cannot change at runtime.** The tab controller length must match the number of tabs, so a bound `length` is only checked with its initial value. Keep it constant for the life of the screen, or replace the whole controller by rendering a new screen.
+- **`opacity` and `sliverOpacity` accept only `0` to `1`.** A bound value outside that range is a Flutter assertion, exactly as it would be with a literal.
+- **String properties that are not text** (enums such as `mainAxisAlignment`, colors, URLs, ids) are only checked by passing the original value through the binding: the audit cannot invent another valid enum value, color or URL. They resolve the same way as any other binding, but a different value is covered by the same mechanism rather than by its own test.
