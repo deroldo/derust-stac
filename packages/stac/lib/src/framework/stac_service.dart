@@ -360,7 +360,14 @@ class StacService {
     final applied = StacEnvelope.apply(json, type);
     if (applied == null) return const SizedBox.shrink();
     final model = parser.getModel(applied);
-    return parser.parse(context, model);
+    final built = parser.parse(context, model);
+    // These stateful inputs always own an internal change handler, so removing
+    // the action keys is not enough to look/act disabled.
+    if (applied['enabled'] == false &&
+        (type == 'checkBox' || type == 'switch' || type == 'slider')) {
+      return IgnorePointer(child: Opacity(opacity: 0.38, child: built));
+    }
+    return built;
   }
 
   static Widget? _onWidgetError({

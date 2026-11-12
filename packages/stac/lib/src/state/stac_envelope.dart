@@ -30,7 +30,50 @@ class StacEnvelope {
 
   /// Extension point (Task 10): how `enabled` is applied to widgets that have
   /// no native `enabled`. Types absent here receive `enabled` untouched.
-  static final Map<String, StacDisableStrategy> disableStrategy = {};
+  static final Map<String, StacDisableStrategy> disableStrategy = {
+    for (final type in _tappableTypes) type: _disableTappable,
+  };
+
+  static const List<String> _tappableTypes = [
+    'elevatedButton',
+    'filledButton',
+    'outlinedButton',
+    'textButton',
+    'iconButton',
+    'floatingActionButton',
+    'inkWell',
+    'gestureDetector',
+    'chip',
+    'checkBox',
+    'switch',
+    'slider',
+  ];
+
+  static const List<String> _touchKeys = [
+    'onPressed',
+    'onTap',
+    'onLongPress',
+    'onDoubleTap',
+    'onChanged',
+    'onChangeEnd',
+    'onSelected',
+    'onDeleted',
+  ];
+
+  /// `enabled: false` drops the touch actions so Flutter renders the widget
+  /// disabled (null callback). A widget without any of them ignores `enabled`.
+  static Map<String, dynamic> _disableTappable(
+    Map<String, dynamic> json,
+    bool enabled,
+  ) {
+    if (enabled) return json;
+    if (!_touchKeys.any(json.containsKey)) {
+      Log.d('"enabled" ignored: "${json['type']}" has no touch action');
+      return json;
+    }
+    return Map<String, dynamic>.of(json)
+      ..removeWhere((k, _) => _touchKeys.contains(k));
+  }
 
   /// `visible` is a native property of these; the others are hidden by the
   /// envelope.
@@ -54,6 +97,10 @@ class StacEnvelope {
     final key = result.remove('bind');
     final target = bindTarget[type];
     if (target == null) {
+      if (type == 'radio') {
+        Log.e('"bind" on a radio is invalid; put "bind" on its radioGroup');
+        return result;
+      }
       Log.w('"bind" is not supported by widget "$type"; ignored');
       return result;
     }

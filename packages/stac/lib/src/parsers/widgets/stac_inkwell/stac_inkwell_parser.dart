@@ -15,19 +15,43 @@ class StacInkwellParser extends StacParser<StacInkWell> {
   @override
   Widget parse(BuildContext context, StacInkWell model) {
     return InkWell(
-      onTap: () => model.onTap?.parse(context),
-      onDoubleTap: () => model.onDoubleTap?.parse(context),
-      onLongPress: () => model.onLongPress?.parse(context),
-      onTapCancel: () => model.onTapCancel?.parse(context),
-      onSecondaryTap: () => model.onSecondaryTap?.parse(context),
-      onSecondaryTapCancel: () => model.onSecondaryTapCancel?.parse(context),
-      onTapDown: (_) => model.onTapDown?.parse(context),
-      onTapUp: (_) => model.onTapUp?.parse(context),
-      onSecondaryTapUp: (_) => model.onSecondaryTapUp?.parse(context),
-      onSecondaryTapDown: (_) => model.onSecondaryTapDown?.parse(context),
-      onHighlightChanged: (_) => model.onHighlightChanged?.parse(context),
-      onHover: (_) => model.onHover?.parse(context),
-      onFocusChange: (_) => model.onFocusChange?.parse(context),
+      onTap: model.onTap == null ? null : () => model.onTap!.parse(context),
+      onDoubleTap: model.onDoubleTap == null
+          ? null
+          : () => model.onDoubleTap!.parse(context),
+      onLongPress: model.onLongPress == null
+          ? null
+          : () => model.onLongPress!.parse(context),
+      onTapCancel: model.onTapCancel == null
+          ? null
+          : () => model.onTapCancel!.parse(context),
+      onSecondaryTap: model.onSecondaryTap == null
+          ? null
+          : () => model.onSecondaryTap!.parse(context),
+      onSecondaryTapCancel: model.onSecondaryTapCancel == null
+          ? null
+          : () => model.onSecondaryTapCancel!.parse(context),
+      onTapDown: model.onTapDown == null
+          ? null
+          : (_) => model.onTapDown!.parse(context),
+      onTapUp: model.onTapUp == null
+          ? null
+          : (_) => model.onTapUp!.parse(context),
+      onSecondaryTapUp: model.onSecondaryTapUp == null
+          ? null
+          : (_) => model.onSecondaryTapUp!.parse(context),
+      onSecondaryTapDown: model.onSecondaryTapDown == null
+          ? null
+          : (_) => model.onSecondaryTapDown!.parse(context),
+      onHighlightChanged: model.onHighlightChanged == null
+          ? null
+          : (_) => model.onHighlightChanged!.parse(context),
+      onHover: model.onHover == null
+          ? null
+          : (_) => model.onHover!.parse(context),
+      onFocusChange: model.onFocusChange == null
+          ? null
+          : (_) => model.onFocusChange!.parse(context),
       mouseCursor: model.mouseCursor?.parse,
       focusColor: model.focusColor?.toColor(context),
       hoverColor: model.hoverColor?.toColor(context),

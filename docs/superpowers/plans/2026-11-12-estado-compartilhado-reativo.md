@@ -294,7 +294,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 8: `bind`/`value`/`onChanged` em checkBox, switch, slider, radio, radioGroup
+### Task 8: `bind`/`value`/`onChanged` em checkBox, switch, slider, radio, radioGroup [CONCLUIDA]
 
 **Dificuldade:** medio. **Depende de:** T4, T5, T6. **Paralela com:** T9, T10.
 
@@ -311,7 +311,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 9: `bind`/`onChanged` em textField, textFormField, dropdownMenu
+### Task 9: `bind`/`onChanged` em textField, textFormField, dropdownMenu [CONCLUIDA]
 
 **Dificuldade:** complexo (controller, foco, cursor). **Depende de:** T4, T5, T6. **Paralela com:** T8, T10.
 
@@ -328,7 +328,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 10: `enabled` e acao de toque por binding
+### Task 10: `enabled` e acao de toque por binding [CONCLUIDA]
 
 **Dificuldade:** medio. **Depende de:** T4. **Paralela com:** T8, T9.
 
