@@ -25,7 +25,7 @@ The Stac Conditional allows you to conditionally render widgets based on a boole
 
 | Property  | Type                   | Description                                                                 |
 |-----------|------------------------|-----------------------------------------------------------------------------|
-| condition | `String`               | **Required.** The boolean expression to evaluate at runtime.                |
+| condition | `String` or `bool` or binding | **Required.** The boolean expression to evaluate at runtime. A [binding](/concepts/bindings_and_expressions) (`{ "$state": ... }` / `{ "$expr": ... }`) or a literal `bool` is also accepted. |
 | ifTrue    | `StacWidget`           | **Required.** The widget to render when condition evaluates to true.        |
 | ifFalse   | `StacWidget`           | The widget to render when condition evaluates to false. Renders empty if null. |
 
@@ -93,6 +93,40 @@ StacConditional(
     </Frame>
   </Tab>
 </Tabs>
+## Conditional with State
+
+`condition` can be a [binding](/concepts/bindings_and_expressions). The widget is redrawn whenever a key the binding reads changes. A condition that does not resolve to a real `bool` (invalid expression, missing key, text) counts as `false`, and a warning is logged.
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'conditional',
+    'condition': StacBinding.expr('total >= 10'),
+    'ifTrue': StacText(data: 'Limit reached'),
+    'ifFalse': StacText(data: 'Keep counting'),
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "total": 3 },
+  "children": [
+    {
+      "type": "conditional",
+      "condition": { "$expr": "total >= 10" },
+      "ifTrue": { "type": "text", "data": "Limit reached" },
+      "ifFalse": { "type": "text", "data": "Keep counting" }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+For a single widget, the `visible` property described in [Reactivity](/concepts/reactivity#showing-and-hiding-with-visible) is a shorter alternative to `conditional`.
+
 ## Conditional with Complex Widgets
 
 <CodeGroup>

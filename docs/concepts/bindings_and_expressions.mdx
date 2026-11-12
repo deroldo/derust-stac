@@ -1,0 +1,178 @@
+---
+title: "Bindings and Expressions"
+description: "Read state in any widget or action property with $state and $expr, and the expression language they use"
+---
+
+A binding is a JSON object that stands in for a value and is replaced by the current state when the widget is drawn or the action runs. There are two forms:
+
+| Form                          | Meaning                                                              |
+|-------------------------------|----------------------------------------------------------------------|
+| `{ "$state": "path" }`        | Reads a state path: `total`, `user.name`, `global.token`, `items[0]`. |
+| `{ "$expr": "expression" }`   | Evaluates an [expression](#expression-language).                      |
+
+A map is a binding only if it has exactly one key (`$state` or `$expr`) and the value is text. Any other map is plain data.
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'text',
+    'data': StacBinding.expr("'Total: ' + total"),
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "total": 3 },
+  "children": [
+    { "type": "text", "data": { "$expr": "'Total: ' + total" } }
+  ]
+}
+```
+</CodeGroup>
+
+`$state` accepts only a plain path (identifiers, `.field` and literal `[index]`). Anything else, such as `{ "$state": "a + 1" }`, logs a warning and evaluates to `null`; use `$expr` instead.
+
+## Where bindings work
+
+- **Any widget property**, in the widget's own JSON, including `visible` and `enabled`. Child widgets and nested actions resolve their own bindings, so a binding is evaluated by the widget that owns it.
+- **Action properties.** Bindings in an action are resolved at the moment the action runs, never earlier. The `condition` property of any action is also a binding (see [Conditions](#conditions)).
+- **`conditional`**: `condition` accepts a binding or a literal `bool`. A `String` keeps the older expression syntax.
+- **Initial `state` values**, resolved once when the scope is created.
+
+## Names in scope
+
+The first name of a path is looked up in this order:
+
+1. Local variables of the place where the binding is evaluated (for example `event` inside an input's `onChanged`, or `params`).
+2. `global`, the read-only view of the [global state](/concepts/state#global-state): `global.userName`.
+3. A key of the screen state.
+
+Local variables win over screen keys, which is why those names are reserved and cannot be declared as keys: `global`, `params`, `result`, `response`, `event`.
+
+An unknown key reads as `null`. Reading a field of `null`, or a missing field of an object, also yields `null`.
+
+## Expression language
+
+Expressions are interpreted by a closed, side-effect-free evaluator. There is no way to run arbitrary code or to write state from an expression.
+
+### Literals
+
+Numbers (`3`, `2.5`), text in single or double quotes (`'abc'`, `"abc"`, with `\n`, `\t`, `\r` and escaped quotes), `true`, `false` and `null`.
+
+### Operators and precedence
+
+From the loosest to the tightest binding:
+
+| Level | Operators                  | Notes                                                                  |
+|-------|----------------------------|------------------------------------------------------------------------|
+| 1     | `a ? b : c`                | Ternary. The condition must be a `bool`. Right associative.            |
+| 2     | `\|\|`                     | Short-circuit.                                                         |
+| 3     | `&&`                       | Short-circuit.                                                         |
+| 4     | `==` `!=`                  | No coercion: `3 != "3"`. Lists and objects compare deeply.            |
+| 5     | `<` `<=` `>` `>=`          | Numbers only.                                                          |
+| 6     | `+` `-`                    | `+` also concatenates text.                                            |
+| 7     | `*` `/` `%`                | Numbers only. Division or modulo by zero is invalid.                   |
+| 8     | `!` `-` (unary)            | `!` needs a `bool`, unary `-` needs a number.                          |
+| 9     | `.field` `[index]` `(...)` | Field access, list index or object key, and parentheses.               |
+
+### Functions
+
+The set is closed; an unknown function is a syntax error.
+
+| Function                            | Result                                                                                         |
+|-------------------------------------|------------------------------------------------------------------------------------------------|
+| `length(x)`                         | Characters of a text or items of a list. `length(null)` is `0`.                                |
+| `trim(text)`                        | Text without leading and trailing whitespace. `trim(null)` is an empty text.                   |
+| `contains(list, value)`             | `true` if some item equals `value` (deep equality). `contains(null, v)` is `false`.            |
+| `contains(list, object, "field")`   | `true` if some item of `list` is an object whose `field` equals `object.field`.                |
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'text',
+    'data': StacBinding.expr("length(trim(name)) >= 3 ? 'ok' : 'too short'"),
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "name": "  Ana " },
+  "children": [
+    {
+      "type": "text",
+      "data": { "$expr": "length(trim(name)) >= 3 ? 'ok' : 'too short'" }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+### Text concatenation
+
+When either side of `+` is text, the result is text. The other side may be text, a number or a `bool`; a number with no fractional part prints without `.0` (`'n=' + 3` is `n=3`, even if `3` came from a division). `null`, lists and objects are not valid operands: the expression is invalid and evaluates to `null`. Use `$expr` with a default such as `x == null ? '' : x`, or bind the value directly to `text.data`.
+
+If neither side is text, `+` needs two numbers.
+
+## Fallbacks
+
+Bindings never throw. When something is wrong the runtime logs a warning (secure values are redacted) and falls back like this:
+
+| Situation                                                                 | Result                                         |
+|---------------------------------------------------------------------------|------------------------------------------------|
+| Invalid syntax, unknown function, wrong number of arguments               | The binding evaluates to `null`.               |
+| Type error (`'a' < 1`, `!3`, ternary condition that is not a `bool`)       | The expression evaluates to `null`.            |
+| Division or modulo by zero                                                | The expression evaluates to `null`.            |
+| Missing key, field or index                                               | `null`.                                        |
+| `visible`, `enabled` or `condition` that does not resolve to a real `bool` | Treated as `false`. Strings such as `"true"` and numbers do not count. |
+| `text` or `selectableText` `data` that resolves to something other than text | `null` becomes an empty text; numbers and booleans print as in concatenation; lists and objects print as JSON. |
+| Any other property that receives `null`                                   | The widget gets `null` for it, as if it were omitted. |
+
+A widget whose property receives a value of the wrong type fails like any malformed JSON: the error is logged and, in debug mode, replaced by an error widget.
+
+## Conditions
+
+`condition` can be added to any action. The action runs only when the condition resolves to `true`; a `false`, missing or invalid result skips the whole action, including its nested follow-up actions. The condition is evaluated before the action's other bindings.
+
+<CodeGroup>
+```dart Dart
+StacElevatedButton(
+  child: StacText(data: 'Save'),
+  onPressed: StacAction(jsonData: {
+    'actionType': 'setState',
+    'condition': StacBinding.expr('length(trim(name)) >= 3'),
+    'values': {'saved': true},
+  }),
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "name": "", "saved": false },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Save" },
+      "onPressed": {
+        "actionType": "setState",
+        "condition": { "$expr": "length(trim(name)) >= 3" },
+        "values": { "saved": true }
+      }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Evaluation order
+
+- `&&` and `||` stop at the first operand that decides the result; a ternary evaluates only the branch it takes. The not-taken part is still tracked for [reactivity](/concepts/reactivity), so the widget redraws when keys used only in that branch change.
+- All bindings of one action are resolved together, before the action writes anything. In `setState`, `{ "a": { "$state": "b" }, "b": { "$state": "a" } }` swaps the two keys.
+- In a `multiAction` with `sync: true`, each action is resolved when its turn comes, so it sees what the previous actions wrote. Without `sync`, an action does not wait for the previous one to finish, so use `sync: true` whenever order matters.
+- For `bind` on inputs, the key is written first and the input's own `onChanged` (or `onSelected`) runs after it, so that action already reads the new value. See [Reactivity](/concepts/reactivity#bind-on-inputs).

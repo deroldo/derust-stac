@@ -1,0 +1,97 @@
+{
+  "type": "scaffold",
+  "state": {
+    "total": 0
+  },
+  "appBar": {
+    "type": "appBar",
+    "title": {
+      "type": "text",
+      "data": "State counter"
+    }
+  },
+  "body": {
+    "type": "center",
+    "child": {
+      "type": "column",
+      "mainAxisAlignment": "center",
+      "children": [
+        {
+          "type": "text",
+          "data": {
+            "$expr": "'Total: ' + total"
+          }
+        },
+        {
+          "type": "sizedBox",
+          "height": 8
+        },
+        {
+          "type": "text",
+          "data": "Limit reached",
+          "visible": {
+            "$expr": "total >= 10"
+          }
+        },
+        {
+          "type": "sizedBox",
+          "height": 16
+        },
+        {
+          "type": "row",
+          "mainAxisAlignment": "center",
+          "children": [
+            {
+              "type": "elevatedButton",
+              "enabled": {
+                "$expr": "total > 0"
+              },
+              "child": {
+                "type": "text",
+                "data": "-"
+              },
+              "onPressed": {
+                "actionType": "decrementState",
+                "key": "total",
+                "min": 0
+              }
+            },
+            {
+              "type": "sizedBox",
+              "width": 16
+            },
+            {
+              "type": "elevatedButton",
+              "enabled": {
+                "$expr": "total < 10"
+              },
+              "child": {
+                "type": "text",
+                "data": "+"
+              },
+              "onPressed": {
+                "actionType": "incrementState",
+                "key": "total",
+                "max": 10
+              }
+            }
+          ]
+        },
+        {
+          "type": "sizedBox",
+          "height": 16
+        },
+        {
+          "type": "textButton",
+          "child": {
+            "type": "text",
+            "data": "Reset"
+          },
+          "onPressed": {
+            "actionType": "resetState"
+          }
+        }
+      ]
+    }
+  }
+}

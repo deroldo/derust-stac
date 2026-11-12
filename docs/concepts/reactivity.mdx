@@ -1,0 +1,191 @@
+---
+title: "Reactivity"
+description: "What is redrawn when state changes, how inputs bind to state, and how it coexists with setValue and getFormValue"
+---
+
+Reactivity connects [state](/concepts/state) to the screen. You do not subscribe to anything: a widget that contains a [binding](/concepts/bindings_and_expressions) is redrawn automatically when a key it reads changes.
+
+## What is redrawn
+
+- A widget is tracked only if its **own** JSON contains a binding. The runtime collects the top-level keys the bindings read (`total`, `global.userName`; branches of a ternary count even if not taken) and listens to exactly those keys.
+- When one of them changes, only that widget is rebuilt, using the context of its position in the tree, so theme-dependent values (colors, text styles) stay current. Its children are separate widgets: they rebuild only if they have their own bindings.
+- A widget with no bindings takes the normal path, with no listener and no cost.
+- Widgets that read local variables (`item`, `params`, ...) also follow the enclosing scope that provides them.
+
+A write notifies only when it changes something: writing a scalar equal to the current value is ignored, while lists and objects always notify. Actions that write several keys (`setState`, `resetState`) batch their notifications, so each affected widget rebuilds once.
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'column',
+    'state': {'total': 0},
+    'children': [
+      StacWidget(jsonData: {
+        'type': 'text',
+        'data': StacBinding.expr("'Total: ' + total"),
+      }),
+      StacElevatedButton(
+        child: StacText(data: '+'),
+        onPressed: StacAction(jsonData: {
+          'actionType': 'incrementState',
+          'key': 'total',
+        }),
+      ),
+    ],
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "total": 0 },
+  "children": [
+    { "type": "text", "data": { "$expr": "'Total: ' + total" } },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "+" },
+      "onPressed": { "actionType": "incrementState", "key": "total" }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Showing and hiding with visible
+
+Every widget accepts `visible`. When it resolves to `false` the widget is not built at all (an empty box takes its place). For `visibility` and `sliverVisibility`, `visible` is their native property and keeps its usual meaning.
+
+`visible` follows the strict `bool` rule: a value that is not a real `bool` (invalid expression, missing key, `null`, text) is treated as `false` and a warning is logged.
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'text',
+    'data': 'Limit reached',
+    'visible': StacBinding.expr('total >= 10'),
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "total": 10 },
+  "children": [
+    {
+      "type": "text",
+      "data": "Limit reached",
+      "visible": { "$expr": "total >= 10" }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Enabling and disabling with enabled
+
+`enabled` takes a `bool` or a binding with the same strict rule. Widgets with a native `enabled` (text fields, dropdown menu, radio, list tile, ...) simply receive the resolved value. For these tappable widgets, `enabled: false` removes the touch actions so Flutter draws them disabled:
+
+`elevatedButton`, `filledButton`, `outlinedButton`, `textButton`, `iconButton`, `floatingActionButton`, `inkWell`, `gestureDetector`, `chip`, `checkBox`, `switch` and `slider`.
+
+The removed keys are `onPressed`, `onTap`, `onLongPress`, `onDoubleTap`, `onChanged`, `onChangeEnd`, `onSelected` and `onDeleted`. For `checkBox`, `switch` and `slider` the widget is also made non-interactive and dimmed. A widget without any of those keys ignores `enabled`.
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'elevatedButton',
+    'enabled': StacBinding.expr('total < 10'),
+    'child': StacText(data: '+'),
+    'onPressed': StacAction(jsonData: {
+      'actionType': 'incrementState',
+      'key': 'total',
+    }),
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "total": 0 },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "enabled": { "$expr": "total < 10" },
+      "child": { "type": "text", "data": "+" },
+      "onPressed": { "actionType": "incrementState", "key": "total" }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## bind on inputs
+
+`bind` connects an input to a state key in both directions. The runtime rewrites the widget before building it:
+
+| Widget                            | `bind` sets the value property | and writes the key from       |
+|-----------------------------------|--------------------------------|-------------------------------|
+| `checkBox`, `switch`, `slider`    | `value`                        | `onChanged`                   |
+| `radioGroup`                      | `groupValue`                   | `onChanged`                   |
+| `textField`, `textFormField`      | `initialValue`                 | `onChanged`                   |
+| `dropdownMenu`                    | `initialSelection`             | `onSelected`                  |
+
+`bind: "k"` becomes the value property `{ "$state": "k" }`, and the change callback becomes a synchronous `multiAction` that first runs `setState` with `k` set to `event.value`, then the callback you wrote (if any). So your own `onChanged` always reads the new value, and the store is the single source of truth: changing the key from elsewhere updates the input without firing `onChanged`.
+
+`bind` belongs on the `radioGroup`, not on an individual `radio` (reported as an error). A `bind` that is not a non-empty text, or placed on a widget that does not support it, is logged and ignored. Inside the change callback, `event.value` holds the new value. The example below puts the `checkBox` inside a `form`, which the checkBox widget expects.
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'checkBox',
+    'bind': 'accepted',
+    'onChanged': StacAction(jsonData: {
+      'actionType': 'setState',
+      'values': {'copy': StacBinding.state('accepted')},
+    }),
+  },
+)
+```
+
+```json JSON
+{
+  "type": "form",
+  "state": { "accepted": false, "copy": false },
+  "child": {
+    "type": "column",
+    "children": [
+      {
+        "type": "checkBox",
+        "bind": "accepted",
+        "onChanged": {
+          "actionType": "setState",
+          "values": { "copy": { "$state": "accepted" } }
+        }
+      },
+      {
+        "type": "elevatedButton",
+        "enabled": { "$state": "accepted" },
+        "child": { "type": "text", "data": "Continue" },
+        "onPressed": { "actionType": "none" }
+      }
+    ]
+  }
+}
+```
+</CodeGroup>
+
+## Coexisting with setValue, {{var}} and getFormValue
+
+State is a separate mechanism and does not replace the older ones:
+
+- `{{name}}` placeholders and the [setValue](/actions/set_value) action / widget keep working exactly as before. They are resolved when the JSON is rendered and are not reactive. `$state` bindings do not see those variables and `{{name}}` does not see state keys.
+- Form values (`getFormValue`, `validateForm`) are unchanged. To mirror a form field into state, give the field a `bind` (or write it yourself from `onChanged`).
+- A single widget can mix them: `"data": "{{title}}"` on one widget and `"data": { "$state": "total" }` on another.
+
+Prefer state for anything that must update the UI after the screen is shown; keep `{{var}}` for values known when the screen is rendered.

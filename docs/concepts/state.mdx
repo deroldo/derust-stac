@@ -1,0 +1,157 @@
+---
+title: "State"
+description: "Screen state and global state: declaring keys, reading and writing them, and their lifecycle"
+---
+
+Stac state is a set of named keys that live on the client. Widgets read keys through [bindings](/concepts/bindings_and_expressions), actions write them, and every widget that reads a key is redrawn when the key changes (see [Reactivity](/concepts/reactivity)). The server never has to be asked again for a simple UI change such as a counter, a toggle or a form step.
+
+There are two stores:
+
+| Store  | Declared in   | Address           | Lifetime                                                        |
+|--------|---------------|-------------------|-----------------------------------------------------------------|
+| Screen | `state`       | `total`           | Lives while the screen that declared it is mounted.             |
+| Global | `globalState` | `global.userName` | Lives in memory until the app process ends (optionally persisted). |
+
+## Declaring screen state
+
+Any widget JSON may carry a `state` block. The widget becomes the owner of a screen scope: the keys are available to it and to everything below it.
+
+| Property    | Type                                 | Description                                                                 |
+|-------------|--------------------------------------|-----------------------------------------------------------------------------|
+| state       | `Map<String, dynamic>`               | Key to initial value. Values may be any JSON (numbers, text, bool, list, object, `null`). |
+| globalState | `Map<String, dynamic>`               | Global keys, declared before `state`. See [Global state](#global-state).    |
+| onInit      | `StacAction` or `List<StacAction>`   | Runs once, after the first frame. A list runs in order (`multiAction` with `sync: true`). |
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'column',
+    'state': {'total': 0, 'name': 'Ana', 'items': []},
+    'children': [
+      StacText(data: 'Hello'),
+    ],
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "total": 0, "name": "Ana", "items": [] },
+  "children": [
+    { "type": "text", "data": "Hello" }
+  ]
+}
+```
+</CodeGroup>
+
+Rules enforced by the runtime:
+
+- A key must be declared before it is written. Writing an undeclared key does nothing and logs an error. Reading an undeclared key yields `null`.
+- The names `global`, `params`, `result`, `response` and `event` are reserved and cannot be declared as screen keys (the runtime logs an error and skips them).
+- Initial values are resolved once, when the scope is created, so they may use bindings that read `global` or `params`: `"greeting": { "$expr": "'Hi ' + global.userName" }`.
+- Stored lists and objects are deep-copied and immutable. Change them by writing a new value (`setState`, `appendState`), never in place.
+- Writing a scalar equal to the current value does not notify anyone. Writing a list or an object always does.
+
+## Lifecycle of a screen scope
+
+The scope is keyed by the content of the `state`, `globalState` and `onInit` blocks:
+
+- Re-rendering the same JSON (a theme switch, a parent rebuild) keeps the current values and does not run `onInit` again.
+- Rendering JSON whose blocks differ (for example a new server response) starts a fresh scope: keys go back to the new initial values and `onInit` runs again.
+- When the screen is unmounted its state is disposed and its in-flight requests are cancelled.
+- Dialogs and bottom sheets opened from the screen see the same screen state, even though they live under the navigator.
+
+### onInit
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'column',
+    'state': {'ready': false},
+    'onInit': [
+      StacAction(jsonData: {
+        'actionType': 'setState',
+        'values': {'ready': true},
+      }),
+    ],
+    'children': [],
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "ready": false },
+  "onInit": [
+    { "actionType": "setState", "values": { "ready": true } }
+  ],
+  "children": [
+    {
+      "type": "text",
+      "data": "Ready",
+      "visible": { "$state": "ready" }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Global state
+
+`globalState` declares keys shared by every screen. Declaration is idempotent: if the key already exists (declared by another screen earlier) it keeps its current value.
+
+Each entry is either the initial value itself, or a declaration object that has only the keys `initial`, `persist` and `secure`:
+
+| Property | Type   | Description                                                                                         |
+|----------|--------|-----------------------------------------------------------------------------------------------------|
+| initial  | any    | Initial value.                                                                                      |
+| persist  | `bool` | Keep the value on the device across app launches.                                                   |
+| secure   | `bool` | Keep the value in the platform secure storage. Implies `persist`; `persist: false` is ignored with a warning. Secure values are replaced by `***` in logs. |
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'column',
+    'globalState': {
+      'userName': 'Ana',
+      'theme': {'initial': 'light', 'persist': true},
+      'token': {'initial': '', 'secure': true},
+    },
+    'children': [],
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "globalState": {
+    "userName": "Ana",
+    "theme": { "initial": "light", "persist": true },
+    "token": { "initial": "", "secure": true }
+  },
+  "children": [
+    { "type": "text", "data": { "$expr": "'Hello, ' + global.userName" } }
+  ]
+}
+```
+</CodeGroup>
+
+Address global keys with the `global.` prefix, both in bindings (`global.userName`) and in actions (`"key": "global.userName"`). Persisted keys are loaded before the first screen is built. Only global keys can be persisted: `persist` or `secure` on a screen key is logged and ignored, and the key keeps its `initial` value.
+
+<Note>
+On web there is no platform secure storage; `secure` keys fall back to a no-op with a warning.
+</Note>
+
+## Changing state
+
+Use the mutation actions: [setState](/actions/set_state), [incrementState](/actions/increment_state), [decrementState](/actions/decrement_state), [toggleState](/actions/toggle_state), [resetState](/actions/reset_state) and [appendState](/actions/append_state).
+
+<Note>
+State is independent from the older [setValue](/actions/set_value) variables (`{{name}}`) and from form values read with `getFormValue`. `$state` bindings never see `setValue` variables, and `{{name}}` placeholders never see state keys.
+</Note>

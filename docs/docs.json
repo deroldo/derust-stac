@@ -43,6 +43,9 @@
                             "concepts/rendering_stac_widgets",
                             "concepts/stac_registry",
                             "concepts/navigation_in_stac",
+                            "concepts/state",
+                            "concepts/bindings_and_expressions",
+                            "concepts/reactivity",
                             "concepts/caching",
                             "concepts/custom_widgets",
                             "concepts/custom_actions",
@@ -207,7 +210,13 @@
                     {
                         "group": "State Actions",
                         "pages": [
-                            "actions/set_value"
+                            "actions/set_value",
+                            "actions/set_state",
+                            "actions/increment_state",
+                            "actions/decrement_state",
+                            "actions/toggle_state",
+                            "actions/reset_state",
+                            "actions/append_state"
                         ]
                     },
                     {

@@ -116,6 +116,7 @@ void main() {
       'sliver_to_box_adapter',
       'sliver_visibility',
       'spacer',
+      'state_counter',
       'switch',
       'tab_bar',
       'text_button',

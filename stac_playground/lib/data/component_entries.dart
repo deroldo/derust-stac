@@ -795,6 +795,17 @@ const List<PlaygroundEntry> componentEntries = [
     category: EntryCategory.component,
   ),
   PlaygroundEntry(
+    id: 'state_counter',
+    title: 'State Counter',
+    description:
+        'Shared reactive state: bindings, visible, enabled and state actions',
+    jsonAsset: 'assets/json/state_counter_example.json',
+    dartAsset: 'lib/dsl/state_counter.dart',
+    icon: 'add_circle',
+    iconType: 'material',
+    category: EntryCategory.component,
+  ),
+  PlaygroundEntry(
     id: 'backdrop_filter',
     title: 'Backdrop Filter',
     description: 'Use backdrop filters',

@@ -1,0 +1,78 @@
+---
+title: "Decrement State Action"
+description: "Subtracts a step from a numeric state key"
+---
+
+The `StacDecrementStateAction` subtracts `by` (default `1`) from a numeric [state](/concepts/state) key, then clamps the result between `min` and `max` when they are given. It is the counter action: no expression is needed.
+
+## Properties
+
+| Property | Type     | Description                                                              |
+|----------|----------|--------------------------------------------------------------------------|
+| key      | `String` | **Required.** State key to change. Accepts the `global.` prefix.         |
+| by       | `num`    | Step, default `1`. Accepts a binding.                                    |
+| min      | `num`    | Lower bound, inclusive. Optional. Accepts a binding.                     |
+| max      | `num`    | Upper bound, inclusive. Optional. Accepts a binding.                     |
+
+If the key does not hold a number, or `by` is not a number, the action logs an error and changes nothing. The bounds clamp the result only: they do not stop the action from running, and a value that was already outside the range is moved to the nearest bound. The opposite action is [incrementState](/actions/increment_state).
+
+## Example
+
+<CodeGroup>
+```dart Dart
+StacDecrementStateAction(
+  key: 'total',
+  by: 2,
+  min: 0,
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "total": 4 },
+  "children": [
+    { "type": "text", "data": { "$expr": "'Total: ' + total" } },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "-2" },
+      "onPressed": {
+        "actionType": "decrementState",
+        "key": "total",
+        "by": 2,
+        "min": 0
+      }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Step from another key
+
+<CodeGroup>
+```dart Dart
+StacDecrementStateAction(
+  key: 'total',
+  by: StacBinding.state('step'),
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "total": 0, "step": 5 },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Apply step" },
+      "onPressed": {
+        "actionType": "decrementState",
+        "key": "total",
+        "by": { "$state": "step" }
+      }
+    }
+  ]
+}
+```
+</CodeGroup>

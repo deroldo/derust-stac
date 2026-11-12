@@ -1,0 +1,41 @@
+---
+title: "Toggle State Action"
+description: "Invert a boolean state key"
+---
+
+The `StacToggleStateAction` inverts a boolean [state](/concepts/state) key.
+
+## Properties
+
+| Property | Type     | Description                                                      |
+|----------|----------|------------------------------------------------------------------|
+| key      | `String` | **Required.** State key to toggle. Accepts the `global.` prefix. |
+
+If the key does not hold a `bool` (including `null` or an undeclared key), the action logs an error and changes nothing; it never converts other values.
+
+## Example
+
+<CodeGroup>
+```dart Dart
+StacToggleStateAction(key: 'expanded')
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "expanded": false },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Toggle details" },
+      "onPressed": { "actionType": "toggleState", "key": "expanded" }
+    },
+    {
+      "type": "text",
+      "data": "Details",
+      "visible": { "$state": "expanded" }
+    }
+  ]
+}
+```
+</CodeGroup>

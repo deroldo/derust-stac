@@ -1,0 +1,41 @@
+---
+title: "Reset State Action"
+description: "Restore state keys to their initial values"
+---
+
+The `StacResetStateAction` restores keys to the value they had when they were declared. Without `keys` it resets the whole screen state.
+
+## Properties
+
+| Property | Type            | Description                                                                                  |
+|----------|-----------------|----------------------------------------------------------------------------------------------|
+| keys     | `List<String>`  | Keys to reset. Accepts the `global.` prefix. When omitted, every key of the current screen is reset. |
+
+The initial value is the one stored at declaration time, after its own bindings were resolved. Resetting without `keys` affects the screen state only; global keys are reset only when listed explicitly (`"global.token"`). Keys that are not declared are ignored. All resets are batched, so dependent widgets rebuild once.
+
+## Example
+
+<CodeGroup>
+```dart Dart
+StacResetStateAction(keys: ['name', 'accepted'])
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "name": "", "accepted": false, "step": 1 },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Clear form" },
+      "onPressed": { "actionType": "resetState", "keys": ["name", "accepted"] }
+    },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Reset everything" },
+      "onPressed": { "actionType": "resetState" }
+    }
+  ]
+}
+```
+</CodeGroup>

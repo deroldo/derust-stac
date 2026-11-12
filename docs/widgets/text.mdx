@@ -22,7 +22,7 @@ To know more about the text widget in Flutter, refer to the [official documentat
 
 | Property        | Type                   | Description                                        |
 |-----------------|------------------------|----------------------------------------------------|
-| data            | `String`               | The text to display.                               |
+| data            | `String` or binding    | The text to display. May be a [binding](/concepts/bindings_and_expressions). |
 | children        | `List<StacTextSpan>`   | The list of text spans to display.                 |
 | style           | `StacTextStyle`        | The style to apply to the text.                    |
 | copyWithStyle   | `StacCustomTextStyle`  | Optional style overrides applied on top of style.  |
@@ -98,3 +98,34 @@ StacText(
     </Frame>
   </Tab>
 </Tabs>
+
+## Text from State
+
+`data` can be a `$state` or `$expr` binding. The text is redrawn when a key it reads changes. A `null` value shows an empty text, numbers and booleans are printed as text (a number without a fractional part has no `.0`), and lists or objects are printed as JSON. Every widget also accepts [`visible`](/concepts/reactivity#showing-and-hiding-with-visible).
+
+<CodeGroup>
+```dart Dart
+StacWidget(
+  jsonData: {
+    'type': 'text',
+    'data': StacBinding.expr("'Total: ' + total"),
+    'visible': StacBinding.expr('total > 0'),
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "total": 2 },
+  "children": [
+    {
+      "type": "text",
+      "data": { "$expr": "'Total: ' + total" },
+      "visible": { "$expr": "total > 0" }
+    },
+    { "type": "text", "data": { "$state": "total" } }
+  ]
+}
+```
+</CodeGroup>

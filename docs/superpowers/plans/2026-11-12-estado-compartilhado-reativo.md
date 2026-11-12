@@ -278,7 +278,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 7: Docs e playground da Fase 1
+### Task 7: Docs e playground da Fase 1 [CONCLUIDA]
 
 **Dificuldade:** simples. **Depende de:** T5, T6.
 

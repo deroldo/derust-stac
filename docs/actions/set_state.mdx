@@ -1,0 +1,60 @@
+---
+title: "Set State Action"
+description: "Write several state keys at once"
+---
+
+The `StacSetStateAction` writes one or more [state](/concepts/state) keys in a single step. Widgets that read those keys are redrawn once, after all the writes.
+
+## Properties
+
+| Property | Type                     | Description                                                              |
+|----------|--------------------------|--------------------------------------------------------------------------|
+| values   | `Map<String, dynamic>`   | **Required.** Key to the value (or binding) to write.                    |
+
+A key must have been declared in `state` or `globalState`; writing an undeclared key logs an error and writes nothing. Keys accept the `global.` prefix. Values may be any JSON or a [binding](/concepts/bindings_and_expressions); all bindings are resolved before any key is written, so `{ "a": { "$state": "b" }, "b": { "$state": "a" } }` swaps the two. Writing a value equal to the current scalar does not trigger a redraw.
+
+Compared to [setValue](/actions/set_value), `setState` is reactive, takes a map instead of a list of key/value pairs, and has no follow-up `action` (put it in a synchronous `multiAction` instead).
+
+## Example
+
+<CodeGroup>
+```dart Dart
+StacSetStateAction(
+  values: {
+    'name': 'Ana',
+    'greeted': true,
+    'global.lastUser': StacBinding.state('name'),
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "name": "", "greeted": false },
+  "globalState": { "lastUser": "" },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Greet" },
+      "onPressed": {
+        "actionType": "setState",
+        "values": {
+          "name": "Ana",
+          "greeted": true,
+          "global.lastUser": { "$state": "name" }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "data": { "$expr": "greeted ? 'Hi ' + name : 'Nobody yet'" }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+<Note>
+`global.lastUser` above receives the value `name` had before this action ran, because all bindings are resolved first.
+</Note>

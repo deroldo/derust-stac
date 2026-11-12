@@ -1,0 +1,51 @@
+---
+title: "Append State Action"
+description: "Add an item to a list state key"
+---
+
+The `StacAppendStateAction` appends a value to a list [state](/concepts/state) key. It writes a new list, so widgets reading the key are redrawn.
+
+## Properties
+
+| Property | Type       | Description                                                          |
+|----------|------------|----------------------------------------------------------------------|
+| key      | `String`   | **Required.** State key that holds a list. Accepts the `global.` prefix. |
+| value    | `dynamic`  | The item to append: any JSON or a [binding](/concepts/bindings_and_expressions). Omitting it appends `null`. |
+
+If the key does not hold a list (declare it as `[]` to start empty), the action logs an error and changes nothing. The value is resolved when the action runs, so appending `{ "$state": "draft" }` adds what `draft` holds at that moment.
+
+## Example
+
+<CodeGroup>
+```dart Dart
+StacMultiAction(
+  sync: true,
+  actions: [
+    StacAppendStateAction(key: 'tags', value: StacBinding.state('draft')),
+    StacSetStateAction(values: {'draft': ''}),
+  ],
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "tags": [], "draft": "news" },
+  "children": [
+    { "type": "text", "data": { "$expr": "'Tags: ' + length(tags)" } },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Add tag" },
+      "onPressed": {
+        "actionType": "multiAction",
+        "sync": true,
+        "actions": [
+          { "actionType": "appendState", "key": "tags", "value": { "$state": "draft" } },
+          { "actionType": "setState", "values": { "draft": "" } }
+        ]
+      }
+    }
+  ]
+}
+```
+</CodeGroup>

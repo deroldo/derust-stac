@@ -778,6 +778,23 @@ class _DslParser {
       return raw is Map<String, dynamic> ? raw : <String, dynamic>{};
     }
 
+    // `StacWidget(jsonData: {...})` is the same escape hatch for a widget map
+    // (used for properties the typed models do not expose yet, such as screen
+    // `state`, `visible`, `enabled` and bindings).
+    if (className == 'StacWidget') {
+      final raw = args.named['jsonData'];
+      return raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+    }
+
+    // `StacBinding.state('k')` / `StacBinding.expr('e')` build the binding maps
+    // `{"\$state": "k"}` / `{"\$expr": "e"}`.
+    if (className == 'StacBinding' &&
+        (constructor == 'state' || constructor == 'expr') &&
+        args.positional.length == 1 &&
+        args.named.isEmpty) {
+      return <String, dynamic>{'\$$constructor': args.positional.first};
+    }
+
     if (args.positional.isNotEmpty) {
       throw DslParseException(
         '$className${constructor == null ? '' : '.$constructor'}() uses '
