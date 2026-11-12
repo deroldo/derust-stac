@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:stac/stac.dart';
+import 'package:stac_logger/stac_logger.dart';
 
 class StacSwitchParser extends StacParser<StacSwitch> {
   const StacSwitchParser();
@@ -79,6 +80,13 @@ class _SwitchWidgetState extends State<_SwitchWidget> {
       return widget;
     }
 
+    // A bound/hidden icon is wrapped by the state layer and cannot be handed
+    // to the framework's WidgetStateProperty<Icon?>.
+    if (widget != null) {
+      Log.w(
+        'switch thumbIcon must be a plain icon; bindings are not supported',
+      );
+    }
     return null;
   }
 
@@ -121,7 +129,7 @@ class _SwitchWidgetState extends State<_SwitchWidget> {
       ),
       trackOutlineWidth: WidgetStateProperty.all(model.trackOutlineWidth),
       thumbIcon: WidgetStateProperty.all(
-        model.thumbIcon?.parse(context) as Icon?,
+        thumbIconWidget(context, model.thumbIcon?.toJson()),
       ),
       dragStartBehavior:
           model.dragStartBehavior?.parse ?? DragStartBehavior.start,
@@ -157,7 +165,7 @@ class _SwitchWidgetState extends State<_SwitchWidget> {
       ),
       trackOutlineWidth: WidgetStateProperty.all(model.trackOutlineWidth),
       thumbIcon: WidgetStateProperty.all(
-        model.thumbIcon?.parse(context) as Icon?,
+        thumbIconWidget(context, model.thumbIcon?.toJson()),
       ),
       materialTapTargetSize: model.materialTapTargetSize?.parse,
       dragStartBehavior:

@@ -17,7 +17,14 @@ extension StacWidgetParser on StacWidget? {
 
     final Widget? widget = Stac.fromJson(this!.toJson(), context);
 
-    return widget as PreferredSizeWidget?;
+    if (widget == null || widget is PreferredSizeWidget) {
+      return widget as PreferredSizeWidget?;
+    }
+    // Error widgets and other stand-ins still have to fit the slot.
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(kToolbarHeight),
+      child: widget,
+    );
   }
 }
 

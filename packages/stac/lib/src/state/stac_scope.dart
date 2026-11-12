@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 
 import 'package:dio/dio.dart';
@@ -146,12 +147,20 @@ class StacStateScope extends StatefulWidget {
   final Widget child;
 
   /// Nearest screen store, without creating a rebuild dependency.
-  static StacStateStore? storeOf(BuildContext context) =>
-      context.getInheritedWidgetOfExactType<_StacStateInherited>()?.store;
+  static StacStateStore? storeOf(BuildContext context) {
+    final captured = StacCapturedScope.forContext(context);
+    if (captured != null) return captured.scope._screen;
+    return context.getInheritedWidgetOfExactType<_StacStateInherited>()?.store;
+  }
 
-  static StacRequestRegistry requestsOf(BuildContext context) =>
-      context.getInheritedWidgetOfExactType<_StacStateInherited>()?.requests ??
-      _orphanRequests;
+  static StacRequestRegistry requestsOf(BuildContext context) {
+    final captured = StacCapturedScope.forContext(context);
+    if (captured != null) return captured.requests;
+    return context
+            .getInheritedWidgetOfExactType<_StacStateInherited>()
+            ?.requests ??
+        _orphanRequests;
+  }
 
   static final StacRequestRegistry _orphanRequests = StacRequestRegistry();
 
@@ -315,6 +324,16 @@ class StacScope implements StacEvalContext {
   /// Snapshot of the scopes at [context]. Creates no dependency on the state
   /// scope (only the local variables are read, also without dependency).
   factory StacScope.of(BuildContext context) {
+    final captured = StacCapturedScope.forContext(context);
+    if (captured != null) {
+      // Inside a captured action chain (networkRequest callbacks): the scope
+      // seen at trigger time, plus the variables of the current action.
+      return StacScope._(
+        {...captured.scope._locals, ...currentStacActionVars()},
+        captured.scope._screen,
+        captured.scope._global,
+      );
+    }
     final locals = {
       ...StacLocalScope.varsOf(context),
       ...currentStacActionVars(),
@@ -372,3 +391,58 @@ class StacScope implements StacEvalContext {
     return store.write(isGlobal ? path.substring(7) : path, value);
   }
 }
+
+const Symbol _capturedScopeKey = #stacCapturedScope;
+
+/// The scopes visible where an action chain was triggered: lexical variables
+/// (`item`, `index`, ...), the screen store and the request registry.
+///
+/// A `networkRequest` outlives the widget that triggered it (an optimistic
+/// delete removes the button, a dialog button closes its dialog, a
+/// `pushReplacement` replaces the screen), but its callbacks must still see
+/// the trigger-time scopes, not whatever that widget's element is now showing.
+/// The chain runs inside [runWithStacCapturedScope]; while it does,
+/// `StacScope.of`, `StacStateScope.storeOf` and `StacStateScope.requestsOf`
+/// answer from this capture for [origin] instead of from the (possibly
+/// unmounted, or reused) element.
+class StacCapturedScope {
+  StacCapturedScope._(this.origin, this.scope, this.requests);
+
+  /// The context that triggered the chain.
+  final BuildContext origin;
+
+  /// Whether the origin was inside a screen state scope. Screens that closed
+  /// cancel their requests, so only those are discarded by cancellation;
+  /// without a screen the old "widget still mounted" rule applies.
+  bool get hasScreenStore => scope._screen != null;
+
+  final StacScope scope;
+  final StacRequestRegistry requests;
+
+  /// Captures the scopes visible at [context]. Nested chains started from the
+  /// same context reuse the enclosing capture.
+  static StacCapturedScope capture(BuildContext context) =>
+      forContext(context) ??
+      StacCapturedScope._(
+        context,
+        StacScope.of(context),
+        StacStateScope.requestsOf(context),
+      );
+
+  /// The capture of the running chain, when [context] is its origin.
+  static StacCapturedScope? forContext(BuildContext context) {
+    final captured = Zone.current[_capturedScopeKey];
+    return captured is StacCapturedScope && identical(captured.origin, context)
+        ? captured
+        : null;
+  }
+}
+
+/// Runs [body] (and its async continuations) with [captured] active.
+Future<T> runWithStacCapturedScope<T>(
+  StacCapturedScope captured,
+  FutureOr<T> Function() body,
+) => runZoned(
+  () async => await body(),
+  zoneValues: {_capturedScopeKey: captured},
+);

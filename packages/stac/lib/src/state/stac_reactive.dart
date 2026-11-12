@@ -45,3 +45,22 @@ class StacReactive extends StatelessWidget {
     );
   }
 }
+
+/// A [StacReactive] standing where a [PreferredSizeWidget] is expected (the
+/// `appBar` of a Scaffold, `bottom` of an AppBar): the casts of those
+/// parsers keep working for a bound or hidden `appBar`/`tabBar`. The height
+/// is computed by the caller from the values at build time. Other widgets
+/// must not use it: for instance `TabBar` sizes itself from the tabs that are
+/// [PreferredSizeWidget]s.
+class StacPreferredSizeReactive extends StacReactive
+    implements PreferredSizeWidget {
+  const StacPreferredSizeReactive({
+    required super.json,
+    required super.build,
+    required this.preferredSize,
+    super.key,
+  });
+
+  @override
+  final Size preferredSize;
+}

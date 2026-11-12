@@ -28,11 +28,19 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     // Everything up to the first await runs synchronously at trigger time:
     // the previous request with the same key is cancelled right here, so
     // calls are ordered by trigger, not by arrival of the responses.
-    final registry = StacStateScope.requestsOf(context);
+    //
+    // The chain also captures the scopes of the trigger widget: it outlives
+    // that widget when a callback removes it (optimistic delete), closes its
+    // dialog or replaces its screen, and the callbacks must still run.
+    final captured = StacCapturedScope.capture(context);
+    final registry = captured.requests;
     final key = model.requestKey;
     final token = key == null ? registry.beginAnonymous() : registry.begin(key);
     try {
-      return await _run(context, _withStateBody(context, model), token);
+      return await runWithStacCapturedScope<dynamic>(
+        captured,
+        () => _run(context, _withStateBody(context, model), token, captured),
+      );
     } finally {
       registry.finish(key, token);
     }
@@ -42,18 +50,25 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     BuildContext context,
     StacNetworkRequest model,
     CancelToken token,
+    StacCapturedScope captured,
   ) async {
     // A request is discarded (no callback runs) once it was superseded or
-    // cancelled, or when its screen/widget is gone. Checked after every await
-    // so a late response never writes over newer state.
-    bool alive() => !token.isCancelled && context.mounted;
+    // cancelled, which includes its screen closing (the screen cancels all of
+    // its requests). Checked after every await so a late response never
+    // writes over newer state. The trigger widget itself may be gone by then
+    // (the callbacks run with the scope captured at trigger time); only
+    // requests outside any screen state keep the "widget still mounted" rule.
+    bool alive() =>
+        !token.isCancelled && (captured.hasScreenStore || context.mounted);
 
     if (!await _runActions(context, model.onStart, alive)) return null;
-    if (!context.mounted) return null;
 
+    // The trigger context may be unmounted below on purpose: everything that
+    // reads it goes through the captured scope (see StacCapturedScope).
     Response<dynamic>? response;
     try {
       response = await StacNetworkService.request(
+        // ignore: use_build_context_synchronously
         context,
         model,
         cancelToken: token,
@@ -84,9 +99,9 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
         )) {
           return null;
         }
-        if (!context.mounted) return null;
+        // ignore: use_build_context_synchronously
         if (!await _runActions(context, model.onFinally, alive)) return null;
-        if (!context.mounted) return null;
+        // ignore: use_build_context_synchronously
         return _runLegacyResult(context, model, response, alive);
       },
     );
@@ -109,7 +124,11 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
         .firstOrNull;
     if (result == null) {
       if (model.results.isNotEmpty) {
-        Log.w('No networkRequest result for status $statusCode: ${model.url}');
+        Log.w(
+          StacGlobalState.instance.redact(
+            'No networkRequest result for status $statusCode: ${model.url}',
+          ),
+        );
       }
       return null;
     }
@@ -122,7 +141,15 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     }
   }
 
-  /// Runs one action or a list of actions in sequence, awaiting each. Returns
+  /// Actions that open something and finish only when it is closed.
+  static final Set<String> _navigationActions = {
+    ActionType.navigate.name,
+    ActionType.showDialog.name,
+    ActionType.showModalBottomSheet.name,
+  };
+
+  /// Runs one action or a list of actions in sequence, awaiting each (except
+  /// [_navigationActions], which are fired and not awaited). Returns
   /// `false` as soon as the request is no longer [alive] (the rest is
   /// dropped).
   Future<bool> _runActions(
@@ -142,7 +169,26 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
         );
         continue;
       }
-      await Stac.onCallFromJson(Map<String, dynamic>.from(action), context);
+      final json = Map<String, dynamic>.from(action);
+      if (_navigationActions.contains(json['actionType'])) {
+        // Opening a screen/dialog completes only when it is closed (and
+        // `pushReplacement` never completes for the origin): waiting would
+        // hold back `onFinally`. The navigate action runs its own
+        // `onResult`/`onCancel` when the destination returns.
+        final pending = Stac.onCallFromJson(json, context);
+        if (pending is Future) {
+          unawaited(
+            pending.then<void>(
+              (_) {},
+              onError: (Object e) => Log.e(
+                StacGlobalState.instance.redact('navigation action failed: $e'),
+              ),
+            ),
+          );
+        }
+      } else {
+        await Stac.onCallFromJson(json, context);
+      }
       if (!alive()) return false;
     }
     return true;
@@ -180,8 +226,10 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     if (keys == null || keys.isEmpty) return model;
     if (model.body != null) {
       Log.w(
-        'networkRequest ${model.url}: both body and bodyFromState set; '
-        'the explicit body wins',
+        StacGlobalState.instance.redact(
+          'networkRequest ${model.url}: both body and bodyFromState set; '
+          'the explicit body wins',
+        ),
       );
       return model;
     }

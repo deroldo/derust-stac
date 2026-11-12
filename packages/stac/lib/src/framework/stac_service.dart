@@ -303,14 +303,15 @@ class StacService {
     final inner = Map<String, dynamic>.of(json)
       ..removeWhere((key, _) => _screenBlockKeys.contains(key));
     return StacStateScope(
-      key: ValueKey(jsonEncode(blocks).hashCode),
+      // The full content, not its hash: equal hashes of different blocks
+      // would share a key and keep the old state.
+      key: ValueKey<String>(jsonEncode(blocks)),
       initialState: _blockMap(blocks['state'], 'state'),
       globalState: _blockMap(blocks['globalState'], 'globalState'),
       onInit: blocks['onInit'],
       child: Builder(
         builder: (context) =>
-            _buildWidget(context, parser, type, inner) ??
-            const SizedBox.shrink(),
+            _buildWidget(context, parser, type, inner) ?? _hiddenWidget(type),
       ),
     );
   }
@@ -339,31 +340,89 @@ class StacService {
       effective = StacEnvelope.rewriteBind(effective, type);
     }
     if (StacBinding.hasBindings(effective, isAction: false)) {
-      return StacReactive(
-        json: effective,
-        build: (context, resolved) {
-          try {
-            return _parseWidget(
-                  context,
-                  parser,
-                  type,
-                  StacEnvelope.coerceResolved(resolved, type),
-                ) ??
-                const SizedBox.shrink();
-          } catch (e, stackTrace) {
-            return _onWidgetError(
-                  context: context,
-                  type: type,
-                  json: effective,
-                  error: e,
-                  stackTrace: stackTrace,
-                ) ??
-                const SizedBox.shrink();
-          }
-        },
-      );
+      Widget build(BuildContext context, Map<String, dynamic> resolved) {
+        try {
+          return _parseWidget(
+                context,
+                parser,
+                type,
+                StacEnvelope.coerceResolved(resolved, type),
+              ) ??
+              _hiddenWidget(type);
+        } catch (e, stackTrace) {
+          return _onWidgetError(
+                context: context,
+                type: type,
+                json: effective,
+                error: e,
+                stackTrace: stackTrace,
+              ) ??
+              _hiddenWidget(type);
+        }
+      }
+
+      // `appBar`/`tabBar` are cast to PreferredSizeWidget by their parents.
+      if (type == 'appBar' || type == 'tabBar') {
+        return StacPreferredSizeReactive(
+          json: effective,
+          build: build,
+          preferredSize: _preferredSizeOf(context, type, effective),
+        );
+      }
+      return StacReactive(json: effective, build: build);
     }
     return _parseWidget(context, parser, type, effective);
+  }
+
+  /// What stands in for a widget that is not shown (`visible: false`, invalid
+  /// or failed). It must fit the slot its parent put it in: slivers go in a
+  /// viewport and `appBar`/`tabBar` are cast to `PreferredSizeWidget`.
+  static Widget _hiddenWidget(String type) {
+    if (type.startsWith('sliver')) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+    if (type == 'appBar' || type == 'tabBar') {
+      return const PreferredSize(
+        preferredSize: Size.zero,
+        child: SizedBox.shrink(),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  /// Height a bound `appBar`/`tabBar` reserves in its parent (`Scaffold`,
+  /// `AppBar.bottom`), which reads it before the widget builds. Computed once
+  /// from the current values; a binding that later changes the height does
+  /// not move the parent's layout.
+  static Size _preferredSizeOf(
+    BuildContext context,
+    String type,
+    Map<String, dynamic> json,
+  ) {
+    if (type == 'tabBar') return const Size.fromHeight(kTextTabBarHeight);
+    if (type != 'appBar') return const Size.fromHeight(kToolbarHeight);
+    try {
+      final resolved = StacBinding.resolve(
+        json,
+        StacScope.of(context),
+        isAction: false,
+      );
+      if (resolved is! Map) return const Size.fromHeight(kToolbarHeight);
+      if (StacBinding.strictBool(resolved['visible'] ?? true, 'visible') ==
+          false) {
+        return Size.zero;
+      }
+      final height = resolved['toolbarHeight'];
+      final bottom = resolved['bottom'];
+      final bottomHeight = bottom is Map<String, dynamic>
+          ? _preferredSizeOf(context, '${bottom['type']}', bottom).height
+          : 0.0;
+      return Size.fromHeight(
+        (height is num ? height.toDouble() : kToolbarHeight) + bottomHeight,
+      );
+    } catch (_) {
+      return const Size.fromHeight(kToolbarHeight);
+    }
   }
 
   /// `visible`/`enabled` envelope, then the type's own `getModel`/`parse`.
@@ -374,7 +433,7 @@ class StacService {
     Map<String, dynamic> json,
   ) {
     final applied = StacEnvelope.apply(json, type);
-    if (applied == null) return const SizedBox.shrink();
+    if (applied == null) return _hiddenWidget(type);
     final model = parser.getModel(applied);
     final built = parser.parse(context, model);
     // These stateful inputs always own an internal change handler, so removing
@@ -403,7 +462,7 @@ class StacService {
 
     // Return error widget if enabled (debug-only)
     if (_showErrorWidgets && kDebugMode) {
-      return _buildErrorWidget(
+      final widget = _buildErrorWidget(
         context: context,
         error: StacError(
           type: type,
@@ -412,6 +471,10 @@ class StacService {
           stackTrace: stackTrace,
         ),
       );
+      // A sliver's slot only takes slivers.
+      return type != null && type.startsWith('sliver')
+          ? SliverToBoxAdapter(child: widget)
+          : widget;
     }
     return null;
   }
@@ -507,7 +570,9 @@ class StacService {
     if (!hasCondition && !StacBinding.hasBindings(json, isAction: true)) {
       return json;
     }
-    if (!context.mounted) {
+    // A request chain that outlives its trigger widget resolves against the
+    // scope captured at trigger time (see StacCapturedScope).
+    if (!context.mounted && StacCapturedScope.forContext(context) == null) {
       Log.w('Action [$actionType] skipped: its widget is no longer mounted');
       return null;
     }
