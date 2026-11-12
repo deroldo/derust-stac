@@ -348,6 +348,8 @@ void main() {
       await StacService.initialize(
         options: const StacOptions(name: 'n', projectId: 'p'),
         override: true,
+        statePersistence: const NullStatePersistence(),
+        secureStatePersistence: const NullStatePersistence(),
       );
       var calls = 0;
       var total = 0;

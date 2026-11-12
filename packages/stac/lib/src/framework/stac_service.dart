@@ -21,8 +21,10 @@ import 'package:stac/src/parsers/widgets/stac_tool_tip/stac_tool_tip_parser.dart
 import 'package:stac/src/services/stac_network_service.dart';
 import 'package:stac/src/state/stac_binding.dart';
 import 'package:stac/src/state/stac_envelope.dart';
+import 'package:stac/src/state/stac_global_state.dart';
 import 'package:stac/src/state/stac_reactive.dart';
 import 'package:stac/src/state/stac_scope.dart';
+import 'package:stac/src/state/stac_state_persistence.dart';
 import 'package:stac/src/utils/variable_resolver.dart';
 import 'package:stac_core/stac_core.dart' hide StacBinding;
 import 'package:stac_framework/stac_framework.dart';
@@ -169,6 +171,8 @@ class StacService {
     const StacToggleStateActionParser(),
     const StacResetStateActionParser(),
     const StacAppendStateActionParser(),
+    const StacRemoveFromStateActionParser(),
+    const StacToggleItemActionParser(),
   ];
 
   static StacOptions? _options;
@@ -196,6 +200,8 @@ class StacService {
     bool logStackTraces = true,
     StacErrorWidgetBuilder? errorWidgetBuilder,
     StacCacheConfig? cacheConfig,
+    StacStatePersistence? statePersistence,
+    StacStatePersistence? secureStatePersistence,
   }) async {
     _options = options;
     if (cacheConfig != null) {
@@ -209,6 +215,11 @@ class StacService {
     _showErrorWidgets = showErrorWidgets;
     _logStackTraces = logStackTraces;
     _errorWidgetBuilder = errorWidgetBuilder;
+    // D14: persisted global state is loaded before the app's first frame.
+    await StacGlobalState.instance.hydrate(
+      persistence: statePersistence,
+      securePersistence: secureStatePersistence,
+    );
   }
 
   static Widget? fromJson(Map<String, dynamic>? json, BuildContext context) {
@@ -307,7 +318,11 @@ class StacService {
   static Map<String, Object?> _blockMap(Object? value, String name) {
     if (value == null) return const {};
     if (value is Map) return Map<String, Object?>.from(value);
-    Log.e('"$name" must be an object, got $value; ignored');
+    Log.e(
+      StacGlobalState.instance.redact(
+        '"$name" must be an object, got $value; ignored',
+      ),
+    );
     return const {};
   }
 
@@ -629,7 +644,8 @@ class StacService {
 
     buffer.write(' - $error');
 
-    Log.e(buffer.toString());
+    // Secure state values never reach the logs.
+    Log.e(StacGlobalState.instance.redact(buffer.toString()));
 
     // Log stack trace separately if available and enabled
     if (_logStackTraces && stackTrace != null) {
@@ -647,11 +663,31 @@ class StacService {
     required BuildContext context,
     required StacError error,
   }) {
+    error = _redactError(error);
     // Prefer custom builder if provided
     if (_errorWidgetBuilder != null) {
       return _errorWidgetBuilder!(context, error);
     }
 
     return StacErrorWidget(errorDetails: error);
+  }
+
+  /// Hides `secure` state values from the error's message and JSON before it
+  /// reaches any error widget (default or custom).
+  static StacError _redactError(StacError error) {
+    final state = StacGlobalState.instance;
+    if (!state.hasSecrets) return error;
+    final message = error.error.toString();
+    final safeMessage = state.redact(message);
+    final json = error.json;
+    final safeJson = json == null
+        ? null
+        : state.redactJson(json) as Map<String, dynamic>;
+    return StacError(
+      type: error.type,
+      error: safeMessage == message ? error.error : safeMessage,
+      json: safeJson,
+      stackTrace: error.stackTrace,
+    );
   }
 }

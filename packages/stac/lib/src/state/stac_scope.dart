@@ -198,10 +198,28 @@ class _StacStateScopeState extends State<StacStateScope> {
     final initial = widget.initialState.isEmpty
         ? widget.initialState
         : _resolveInitial(widget.initialState);
-    initial.forEach(_store.declare);
+    initial.forEach(
+      (key, value) => _store.declare(key, _screenInitial(key, value)),
+    );
     if (widget.onInit != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _runOnInit());
     }
+  }
+
+  /// Only global keys persist (Plano 5.1.2): a declaration object with
+  /// `persist`/`secure` on a screen key is logged and reduced to its `initial`.
+  static Object? _screenInitial(String key, Object? value) {
+    if (value is Map &&
+        value.containsKey('initial') &&
+        (value.containsKey('persist') || value.containsKey('secure')) &&
+        value.keys.every(const {'initial', 'persist', 'secure'}.contains)) {
+      Log.w(
+        'State key "$key": persist/secure only apply to globalState keys; '
+        'ignored.',
+      );
+      return value['initial'];
+    }
+    return value;
   }
 
   /// Initial values resolved once against `params`/`global` (data, so no
@@ -230,7 +248,11 @@ class _StacStateScopeState extends State<StacStateScope> {
     } else if (onInit is List) {
       action = {'actionType': 'multiAction', 'sync': true, 'actions': onInit};
     } else {
-      Log.e('onInit must be an action or a list of actions, got $onInit');
+      Log.e(
+        StacGlobalState.instance.redact(
+          'onInit must be an action or a list of actions, got $onInit',
+        ),
+      );
       return;
     }
     StacService.onCallFromJson(action, inner);

@@ -13,4 +13,5 @@ export 'package:stac/src/state/stac_scope.dart'
         StacRequestRegistry,
         StacScope,
         StacStateScope;
+export 'package:stac/src/state/stac_state_persistence.dart';
 export 'package:stac/src/state/stac_state_store.dart';

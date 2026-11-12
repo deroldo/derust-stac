@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:stac/src/state/stac_global_state.dart';
 
 /// Structured information about a Stac parsing or runtime error.
 ///
@@ -212,7 +213,9 @@ class _StacErrorWidgetState extends State<StacErrorWidget> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    widget.errorDetails.error.toString(),
+                    StacGlobalState.instance.redact(
+                      widget.errorDetails.error.toString(),
+                    ),
                     style: const TextStyle(color: _errorRed, fontSize: 13),
                   ),
                 ),
@@ -287,10 +290,15 @@ class _StacErrorWidgetState extends State<StacErrorWidget> {
 
   /// Formats JSON with proper indentation or returns error message.
   String _formatJson(Map<String, dynamic> json) {
+    // Secure state values never show up in the error output.
     try {
-      return const JsonEncoder.withIndent('  ').convert(json);
+      return StacGlobalState.instance.redact(
+        const JsonEncoder.withIndent('  ').convert(json),
+      );
     } catch (e) {
-      return 'Error formatting JSON: $e\n\nRaw: $json';
+      return StacGlobalState.instance.redact(
+        'Error formatting JSON: $e\n\nRaw: $json',
+      );
     }
   }
 

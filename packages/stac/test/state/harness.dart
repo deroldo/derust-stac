@@ -55,13 +55,32 @@ class FakeDioAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// Persistence that stores nothing (the platform storages cannot run inside
+/// `testWidgets`, where real asynchrony never completes).
+class NullStatePersistence implements StacStatePersistence {
+  const NullStatePersistence();
+
+  @override
+  Future<Map<String, String>> readAll() async => const {};
+
+  @override
+  Future<void> write(String key, String value) async {}
+
+  @override
+  Future<void> delete(String key) async {}
+}
+
 bool _initialized = false;
 
 /// Initializes [StacService] once per test isolate.
 Future<void> initStacForTest({Dio? dio}) async {
   if (_initialized) return;
   _initialized = true;
-  await StacService.initialize(dio: dio ?? Dio());
+  await StacService.initialize(
+    dio: dio ?? Dio(),
+    statePersistence: const NullStatePersistence(),
+    secureStatePersistence: const NullStatePersistence(),
+  );
 }
 
 /// Renders [json] through `StacService.fromJson` inside a MaterialApp.

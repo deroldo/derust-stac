@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:stac/src/parsers/core/stac_widget_parser.dart';
+import 'package:stac/src/state/stac_global_state.dart';
 import 'package:stac/src/state/stac_scope.dart';
 import 'package:stac_core/stac_core.dart' hide StacBinding;
 import 'package:stac_logger/stac_logger.dart';
@@ -25,7 +26,9 @@ class StacItemTemplate {
     if (items is List) return items;
     if (items != null) {
       Log.w(
-        '"items" of $widgetType must be a list, got $items; rendering none',
+        StacGlobalState.instance.redact(
+          '"items" of $widgetType must be a list, got $items; rendering none',
+        ),
       );
     }
     return const [];

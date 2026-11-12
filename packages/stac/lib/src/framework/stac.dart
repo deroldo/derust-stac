@@ -7,6 +7,7 @@ import 'package:stac/src/framework/stac_error.dart';
 import 'package:stac/src/framework/stac_service.dart';
 import 'package:stac/src/models/stac_cache_config.dart';
 import 'package:stac/src/services/stac_cloud.dart';
+import 'package:stac/src/state/stac_state_persistence.dart';
 import 'package:stac_core/actions/network_request/stac_network_request.dart';
 import 'package:stac_core/core/stac_options.dart';
 import 'package:stac_framework/stac_framework.dart';
@@ -165,6 +166,13 @@ class Stac extends StatelessWidget {
   /// - [cacheConfig]: Global cache configuration for all Stac widgets and
   ///   StacCloud calls. Defaults to networkFirst strategy if not provided.
   ///
+  /// - [statePersistence] / [secureStatePersistence]: storages for global
+  ///   state keys declared with `persist` / `secure`. Default to
+  ///   `shared_preferences` and the platform secure storage (none on web).
+  ///   Persisted keys are loaded before this future completes. Widget tests
+  ///   that call `initialize` inside `testWidgets` should pass in-memory
+  ///   implementations: the platform storages need real asynchrony.
+  ///
   /// ## Example
   ///
   /// ```dart
@@ -188,6 +196,8 @@ class Stac extends StatelessWidget {
     bool logStackTraces = true,
     StacErrorWidgetBuilder? errorWidgetBuilder,
     StacCacheConfig? cacheConfig,
+    StacStatePersistence? statePersistence,
+    StacStatePersistence? secureStatePersistence,
   }) async {
     return StacService.initialize(
       options: options,
@@ -199,6 +209,8 @@ class Stac extends StatelessWidget {
       logStackTraces: logStackTraces,
       errorWidgetBuilder: errorWidgetBuilder,
       cacheConfig: cacheConfig,
+      statePersistence: statePersistence,
+      secureStatePersistence: secureStatePersistence,
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:stac/src/framework/framework.dart';
 import 'package:stac/src/parsers/actions/stac_state_mutation/stac_state_mutation_utils.dart';
 import 'package:stac/src/services/stac_network_service.dart';
 import 'package:stac/src/state/stac_action_vars.dart';
+import 'package:stac/src/state/stac_global_state.dart';
 import 'package:stac/src/state/stac_scope.dart';
 import 'package:stac_core/stac_core.dart';
 import 'package:stac_framework/stac_framework.dart';
@@ -60,9 +61,13 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) return null;
       response = e.response;
-      Log.e(e.response ?? e);
+      Log.e(StacGlobalState.instance.redact('${e.response ?? e}'));
     } catch (e) {
-      Log.e('networkRequest ${model.url} failed: $e');
+      Log.e(
+        StacGlobalState.instance.redact(
+          'networkRequest ${model.url} failed: $e',
+        ),
+      );
     }
     if (!alive()) return null;
 
@@ -130,7 +135,11 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     final list = actions is List ? actions : [actions];
     for (final action in list) {
       if (action is! Map) {
-        Log.e('networkRequest callback expects actions, got $action');
+        Log.e(
+          StacGlobalState.instance.redact(
+            'networkRequest callback expects actions, got $action',
+          ),
+        );
         continue;
       }
       await Stac.onCallFromJson(Map<String, dynamic>.from(action), context);

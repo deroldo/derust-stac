@@ -1,5 +1,6 @@
 import 'package:stac/src/framework/stac_registry.dart';
 import 'package:stac/src/state/expression/stac_expression.dart';
+import 'package:stac/src/state/stac_global_state.dart';
 import 'package:stac/src/state/stac_scope.dart';
 import 'package:stac_logger/stac_logger.dart';
 
@@ -108,7 +109,11 @@ class StacBinding {
   /// D6 for an already resolved [value]: only a real bool counts as `true`.
   static bool strictBool(Object? value, String what) {
     if (value is bool) return value;
-    Log.w('"$what" must evaluate to a bool, got $value; treating as false');
+    Log.w(
+      StacGlobalState.instance.redact(
+        '"$what" must evaluate to a bool, got $value; treating as false',
+      ),
+    );
     return false;
   }
 

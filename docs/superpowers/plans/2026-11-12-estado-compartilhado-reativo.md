@@ -434,7 +434,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 16: `removeFromState`, `toggleItem` e cenario 14.2
+### Task 16: `removeFromState`, `toggleItem` e cenario 14.2 [CONCLUIDA]
 
 **Dificuldade:** medio. **Depende de:** T5, T13, T15.
 
@@ -458,7 +458,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 18: Fase 5 — auditoria de propriedades e widgets restantes
+### Task 18: Fase 5 — auditoria de propriedades e widgets restantes [CONCLUIDA]
 
 **Dificuldade:** medio. **Depende de:** T15.
 
@@ -475,7 +475,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 19: Fase 6 — persistencia e dados sensiveis
+### Task 19: Fase 6 — persistencia e dados sensiveis [CONCLUIDA]
 
 **Dificuldade:** complexo. **Depende de:** T2, T6, T12.
 

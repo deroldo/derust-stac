@@ -51,6 +51,10 @@ class StacMemoryStateStore implements StacStateStore {
   }
 
   @override
+  void declareWithFlags(String key, Object? initial, StacKeyFlags flags) =>
+      declare(key, initial);
+
+  @override
   bool write(String key, Object? value) {
     final notifier = _notifiers[key];
     if (notifier == null || stacReservedStateNames.contains(key)) {

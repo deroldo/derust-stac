@@ -9,7 +9,7 @@ const Set<String> stacReservedStateNames = {
   'event',
 };
 
-/// Flags a key may carry (extension point for persistence, not used yet).
+/// Flags a global key may carry (D12/D13). `secure` implies `persist`.
 class StacKeyFlags {
   const StacKeyFlags({this.persist = false, this.secure = false});
 
@@ -29,6 +29,10 @@ abstract class StacStateStore {
 
   /// Idempotent: if the key already exists, the current value is kept.
   void declare(String key, Object? initial);
+
+  /// Like [declare], with persistence flags. Stores that do not persist keep
+  /// the flags out and behave as [declare].
+  void declareWithFlags(String key, Object? initial, StacKeyFlags flags);
 
   /// Writes an immutable deep copy. Returns `false` (and logs) if the key is
   /// not declared or is reserved.
