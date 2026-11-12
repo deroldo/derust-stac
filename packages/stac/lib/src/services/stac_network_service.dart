@@ -89,6 +89,10 @@ class StacNetworkService {
   }
 
   static Future<dynamic> _updateBody(BuildContext context, dynamic body) async {
+    // Lists (and other non-map JSON) go out untouched; only a missing body
+    // keeps the legacy empty map.
+    if (body != null && body is! Map) return body;
+
     Map<dynamic, dynamic> bodyMap = {};
 
     if (body is Map) {

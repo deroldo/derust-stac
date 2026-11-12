@@ -54,6 +54,12 @@ enum ActionType {
   /// Append a value to a list state key.
   appendState,
 
+  /// Remove an item from a list state key by index or value.
+  removeFromState,
+
+  /// Add an item to a list state key, or remove it when present.
+  toggleItem,
+
   /// Cancel an in-flight network request by its `requestKey`.
   cancelRequest,
 }

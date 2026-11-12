@@ -17,3 +17,5 @@ export 'decrement_state/stac_decrement_state.dart';
 export 'toggle_state/stac_toggle_state.dart';
 export 'reset_state/stac_reset_state.dart';
 export 'append_state/stac_append_state.dart';
+export 'remove_from_state/stac_remove_from_state.dart';
+export 'toggle_item/stac_toggle_item.dart';
