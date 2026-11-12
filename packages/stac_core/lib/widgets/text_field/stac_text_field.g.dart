@@ -69,6 +69,9 @@ StacTextField _$StacTextFieldFromJson(
   autofillHints: (json['autofillHints'] as List<dynamic>?)
       ?.map((e) => e as String)
       .toList(),
+  inputFormatters: (json['inputFormatters'] as List<dynamic>?)
+      ?.map((e) => StacInputFormatter.fromJson(e as Map<String, dynamic>))
+      .toList(),
   onTap: json['onTap'] == null
       ? null
       : StacAction.fromJson(json['onTap'] as Map<String, dynamic>),
@@ -83,47 +86,49 @@ StacTextField _$StacTextFieldFromJson(
       : StacAction.fromJson(json['onSubmitted'] as Map<String, dynamic>),
 );
 
-Map<String, dynamic> _$StacTextFieldToJson(StacTextField instance) =>
-    <String, dynamic>{
-      'initialValue': instance.initialValue,
-      'decoration': instance.decoration?.toJson(),
-      'keyboardType': _$StacTextInputTypeEnumMap[instance.keyboardType],
-      'textInputAction': _$StacTextInputActionEnumMap[instance.textInputAction],
-      'textCapitalization':
-          _$StacTextCapitalizationEnumMap[instance.textCapitalization],
-      'style': instance.style?.toJson(),
-      'textAlign': _$StacTextAlignEnumMap[instance.textAlign],
-      'textDirection': _$StacTextDirectionEnumMap[instance.textDirection],
-      'readOnly': instance.readOnly,
-      'showCursor': instance.showCursor,
-      'autofocus': instance.autofocus,
-      'obscuringCharacter': instance.obscuringCharacter,
-      'obscureText': instance.obscureText,
-      'autocorrect': instance.autocorrect,
-      'enableSuggestions': instance.enableSuggestions,
-      'maxLines': instance.maxLines,
-      'minLines': instance.minLines,
-      'expands': instance.expands,
-      'maxLength': instance.maxLength,
-      'enabled': instance.enabled,
-      'cursorColor': instance.cursorColor,
-      'cursorWidth': const DoubleConverter().toJson(instance.cursorWidth),
-      'cursorHeight': const DoubleConverter().toJson(instance.cursorHeight),
-      'scrollPadding': instance.scrollPadding?.toJson(),
-      'enableInteractiveSelection': instance.enableInteractiveSelection,
-      'mouseCursor': _$StacMouseCursorEnumMap[instance.mouseCursor],
-      'dragStartBehavior':
-          _$StacDragStartBehaviorEnumMap[instance.dragStartBehavior],
-      'scrollPhysics': _$StacScrollPhysicsEnumMap[instance.scrollPhysics],
-      'restorationId': instance.restorationId,
-      'clipBehavior': _$StacClipEnumMap[instance.clipBehavior],
-      'autofillHints': instance.autofillHints,
-      'onTap': instance.onTap?.toJson(),
-      'onChanged': instance.onChanged?.toJson(),
-      'onEditingComplete': instance.onEditingComplete?.toJson(),
-      'onSubmitted': instance.onSubmitted?.toJson(),
-      'type': instance.type,
-    };
+Map<String, dynamic> _$StacTextFieldToJson(
+  StacTextField instance,
+) => <String, dynamic>{
+  'initialValue': instance.initialValue,
+  'decoration': instance.decoration?.toJson(),
+  'keyboardType': _$StacTextInputTypeEnumMap[instance.keyboardType],
+  'textInputAction': _$StacTextInputActionEnumMap[instance.textInputAction],
+  'textCapitalization':
+      _$StacTextCapitalizationEnumMap[instance.textCapitalization],
+  'style': instance.style?.toJson(),
+  'textAlign': _$StacTextAlignEnumMap[instance.textAlign],
+  'textDirection': _$StacTextDirectionEnumMap[instance.textDirection],
+  'readOnly': instance.readOnly,
+  'showCursor': instance.showCursor,
+  'autofocus': instance.autofocus,
+  'obscuringCharacter': instance.obscuringCharacter,
+  'obscureText': instance.obscureText,
+  'autocorrect': instance.autocorrect,
+  'enableSuggestions': instance.enableSuggestions,
+  'maxLines': instance.maxLines,
+  'minLines': instance.minLines,
+  'expands': instance.expands,
+  'maxLength': instance.maxLength,
+  'enabled': instance.enabled,
+  'cursorColor': instance.cursorColor,
+  'cursorWidth': const DoubleConverter().toJson(instance.cursorWidth),
+  'cursorHeight': const DoubleConverter().toJson(instance.cursorHeight),
+  'scrollPadding': instance.scrollPadding?.toJson(),
+  'enableInteractiveSelection': instance.enableInteractiveSelection,
+  'mouseCursor': _$StacMouseCursorEnumMap[instance.mouseCursor],
+  'dragStartBehavior':
+      _$StacDragStartBehaviorEnumMap[instance.dragStartBehavior],
+  'scrollPhysics': _$StacScrollPhysicsEnumMap[instance.scrollPhysics],
+  'restorationId': instance.restorationId,
+  'clipBehavior': _$StacClipEnumMap[instance.clipBehavior],
+  'autofillHints': instance.autofillHints,
+  'inputFormatters': instance.inputFormatters?.map((e) => e.toJson()).toList(),
+  'onTap': instance.onTap?.toJson(),
+  'onChanged': instance.onChanged?.toJson(),
+  'onEditingComplete': instance.onEditingComplete?.toJson(),
+  'onSubmitted': instance.onSubmitted?.toJson(),
+  'type': instance.type,
+};
 
 const _$StacTextInputTypeEnumMap = {
   StacTextInputType.text: 'text',

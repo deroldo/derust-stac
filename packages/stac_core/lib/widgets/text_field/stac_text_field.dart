@@ -82,6 +82,7 @@ class StacTextField extends StacWidget {
     this.restorationId,
     this.clipBehavior,
     this.autofillHints,
+    this.inputFormatters,
     this.onTap,
     this.onChanged,
     this.onEditingComplete,
@@ -197,6 +198,9 @@ class StacTextField extends StacWidget {
 
   /// Autofill hint strings to help the platform identify expected input.
   final List<String>? autofillHints;
+
+  /// Input text formatting rules applied as the user types.
+  final List<StacInputFormatter>? inputFormatters;
 
   /// Called when the user taps on the field.
   final StacAction? onTap;

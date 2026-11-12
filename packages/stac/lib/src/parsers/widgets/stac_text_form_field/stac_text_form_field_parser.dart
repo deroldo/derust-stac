@@ -14,6 +14,7 @@ import 'package:stac/src/parsers/foundation/text/stac_text_input_action_parser.d
 import 'package:stac/src/parsers/foundation/text/stac_text_input_type_parser.dart';
 import 'package:stac/src/parsers/foundation/text/stac_text_style_parser.dart';
 import 'package:stac/src/parsers/widgets/stac_form/stac_form_scope.dart';
+import 'package:stac/src/state/stac_input_utils.dart';
 import 'package:stac/src/utils/color_utils.dart';
 import 'package:stac/src/utils/input_validations.dart';
 import 'package:stac_core/stac_core.dart';
@@ -25,7 +26,7 @@ class StacTextFormFieldParser extends StacParser<StacTextFormField> {
 
   @override
   StacTextFormField getModel(Map<String, dynamic> json) =>
-      StacTextFormField.fromJson(json);
+      StacTextFormField.fromJson(coerceTextInitialValue(json));
 
   @override
   String get type => WidgetType.textFormField.name;
@@ -72,6 +73,22 @@ class _TextFormFieldWidgetState extends State<_TextFormFieldWidget> {
   }
 
   @override
+  void didUpdateWidget(_TextFormFieldWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only an incoming value change is written, and only when it differs from
+    // what the field shows: typing writes the store, which comes back here
+    // with the same text, so focus and caret stay untouched.
+    final incoming = widget.model.initialValue;
+    if (oldWidget.model.initialValue != incoming) {
+      final text = incoming ?? '';
+      if (syncTextController(_controller, text)) {
+        final id = widget.model.id;
+        if (id != null) widget.formScope?.formData[id] = text;
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: _controller,
@@ -80,6 +97,7 @@ class _TextFormFieldWidgetState extends State<_TextFormFieldWidget> {
         if (widget.model.id != null) {
           widget.formScope?.formData[widget.model.id!] = value;
         }
+        callStacInputAction(widget.model.onChanged, context, value);
       },
       keyboardType: widget.model.keyboardType?.parse,
       textInputAction: widget.model.textInputAction?.parse,

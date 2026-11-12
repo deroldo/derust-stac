@@ -1,5 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:stac_core/core/converters/double_converter.dart';
+import 'package:stac_core/core/stac_action.dart';
 import 'package:stac_core/core/stac_widget.dart';
 import 'package:stac_core/foundation/foundation.dart';
 
@@ -66,6 +67,7 @@ class StacDropdownMenu extends StacWidget {
     this.initialSelection,
     this.dropdownMenuEntries,
     this.closeBehavior,
+    this.onSelected,
   });
 
   /// Whether the dropdown is interactive.
@@ -138,6 +140,10 @@ class StacDropdownMenu extends StacWidget {
 
   /// Close behavior for the menu.
   final StacDropdownMenuCloseBehavior? closeBehavior;
+
+  /// Called when an entry is selected. The selected value is available to the
+  /// action as `event.value`.
+  final StacAction? onSelected;
 
   /// Widget type identifier.
   @override

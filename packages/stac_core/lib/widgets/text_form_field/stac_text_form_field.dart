@@ -1,5 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:stac_core/core/converters/double_converter.dart';
+import 'package:stac_core/core/stac_action.dart';
 import 'package:stac_core/core/stac_widget.dart';
 import 'package:stac_core/foundation/foundation.dart';
 
@@ -77,6 +78,7 @@ class StacTextFormField extends StacWidget {
     this.autovalidateMode,
     this.inputFormatters,
     this.validatorRules,
+    this.onChanged,
   });
 
   /// Identifier used by the form scope to store/read this field's value.
@@ -182,6 +184,10 @@ class StacTextFormField extends StacWidget {
 
   /// Declarative validation rules for the form field.
   final List<StacFormFieldValidator>? validatorRules;
+
+  /// Called when the text changes. The new text is available to the action
+  /// as `event.value`.
+  final StacAction? onChanged;
 
   /// Widget type identifier.
   @override
