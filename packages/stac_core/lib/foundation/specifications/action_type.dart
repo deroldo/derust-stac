@@ -53,4 +53,7 @@ enum ActionType {
 
   /// Append a value to a list state key.
   appendState,
+
+  /// Cancel an in-flight network request by its `requestKey`.
+  cancelRequest,
 }

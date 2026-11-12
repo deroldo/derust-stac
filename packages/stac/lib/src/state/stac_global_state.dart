@@ -36,6 +36,12 @@ class StacGlobalState {
     });
   }
 
+  /// Swaps the backing store (tests only), e.g. to stub `isSecure`.
+  @visibleForTesting
+  void useStore(StacStateStore store) {
+    _store = store;
+  }
+
   /// Drops every key (tests only).
   @visibleForTesting
   void clear() {

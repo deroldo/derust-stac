@@ -43,5 +43,9 @@ abstract class StacStateStore {
 
   Object? initialOf(String key);
 
+  /// Whether [key] was declared `secure`. Secure keys are never sent by
+  /// `bodyFromState`. Stores without secure keys keep the default.
+  bool isSecure(String key) => false;
+
   void dispose();
 }

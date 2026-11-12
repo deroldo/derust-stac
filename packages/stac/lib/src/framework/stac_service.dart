@@ -154,6 +154,7 @@ class StacService {
     const StacNoneActionParser(),
     const StacNavigateActionParser(),
     const StacNetworkRequestParser(),
+    const StacCancelRequestParser(),
     const StacModalBottomSheetActionParser(),
     const StacDialogActionParser(),
     const StacGetFormValueParser(),

@@ -12,8 +12,9 @@ class StacNetworkService {
 
   static Future<Response?> request(
     BuildContext context,
-    StacNetworkRequest request,
-  ) async {
+    StacNetworkRequest request, {
+    CancelToken? cancelToken,
+  }) async {
     Map<String, dynamic> headers = Map<String, dynamic>.from(
       request.headers ?? {},
     );
@@ -22,50 +23,68 @@ class StacNetworkService {
 
     switch (request.method) {
       case Method.get:
-        return getRequest(request);
+        return getRequest(request, cancelToken: cancelToken);
       case Method.post:
-        return postRequest(request, context.mounted ? context : context);
+        return postRequest(
+          request,
+          context.mounted ? context : context,
+          cancelToken: cancelToken,
+        );
       case Method.put:
-        return putRequest(request);
+        return putRequest(request, cancelToken: cancelToken);
       case Method.delete:
-        return deleteRequest(request);
+        return deleteRequest(request, cancelToken: cancelToken);
     }
   }
 
-  static Future<Response?> getRequest(StacNetworkRequest request) async {
+  static Future<Response?> getRequest(
+    StacNetworkRequest request, {
+    CancelToken? cancelToken,
+  }) async {
     return _dio.get(
       request.url,
       data: request.body,
       queryParameters: request.queryParameters,
+      cancelToken: cancelToken,
     );
   }
 
   static Future<Response?> postRequest(
     StacNetworkRequest request,
-    BuildContext context,
-  ) async {
+    BuildContext context, {
+    CancelToken? cancelToken,
+  }) async {
     final body = await _updateBody(context, request.body);
 
     return _dio.post(
       request.url,
       data: body,
       queryParameters: request.queryParameters,
+      cancelToken: cancelToken,
     );
   }
 
-  static Future<Response?> putRequest(StacNetworkRequest request) async {
+  static Future<Response?> putRequest(
+    StacNetworkRequest request, {
+    CancelToken? cancelToken,
+  }) async {
     return _dio.put(
       request.url,
       data: request.body,
       queryParameters: request.queryParameters,
+      cancelToken: cancelToken,
     );
   }
 
-  static Future<Response?> deleteRequest(StacNetworkRequest request) async {
+  static Future<Response?> deleteRequest(
+    StacNetworkRequest request, {
+    CancelToken? cancelToken,
+  }) async {
     return _dio.delete(
       request.url,
       data: request.body,
       queryParameters: request.queryParameters,
+      cancelToken: cancelToken,
     );
   }
 

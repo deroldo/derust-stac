@@ -360,7 +360,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 12: `networkRequest` com estado
+### Task 12: `networkRequest` com estado [CONCLUIDA]
 
 **Dificuldade:** complexo. **Depende de:** T8, T9 (cenario 14.1). **Paralela com:** T13.
 
@@ -384,7 +384,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 13: Navegacao com parametros e retorno de resultado
+### Task 13: Navegacao com parametros e retorno de resultado [CONCLUIDA]
 
 **Dificuldade:** complexo. **Depende de:** T6. **Paralela com:** T12.
 
@@ -416,7 +416,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 15: Templates de lista (`items`/`as`/`indexAs`/`itemTemplate`)
+### Task 15: Templates de lista (`items`/`as`/`indexAs`/`itemTemplate`) [CONCLUIDA]
 
 **Dificuldade:** complexo (maior risco, Plano 10). **Depende de:** T4, T6. **Paralela com:** T12, T13.
 

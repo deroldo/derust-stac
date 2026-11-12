@@ -83,6 +83,12 @@ class StacNetworkRequest extends StacAction {
     this.contentType,
     this.body,
     this.results = const [],
+    this.onStart,
+    this.onSuccess,
+    this.onError,
+    this.onFinally,
+    this.requestKey,
+    this.bodyFromState,
   });
 
   /// The absolute or relative URL to request.
@@ -105,6 +111,32 @@ class StacNetworkRequest extends StacAction {
 
   /// List of conditional results that map a response status code to an action.
   final List<StacNetworkResult> results;
+
+  /// Actions run before the request is sent. One action or a list of actions
+  /// (run in sequence, each awaited).
+  final Object? onStart;
+
+  /// Actions run when the response status is 2xx. The variable `response`
+  /// (`{body, statusCode, headers}`) is available to bindings inside them.
+  final Object? onSuccess;
+
+  /// Actions run on a non-2xx status, a connection failure or a timeout.
+  /// `response` is available (`statusCode` and `body` are `null` when there
+  /// was no response).
+  final Object? onError;
+
+  /// Actions run after [onSuccess] or [onError], whichever ran.
+  final Object? onFinally;
+
+  /// Identifies this request on the current screen. Starting another request
+  /// with the same key cancels the previous one, and the cancelled request's
+  /// callbacks never run. See also [StacCancelRequest].
+  final String? requestKey;
+
+  /// State keys (`key` or `global.key`) whose current values are sent as the
+  /// request body, as a `{key: value}` map. Keys declared `secure` are left
+  /// out. An explicit [body] wins over this list.
+  final List<String>? bodyFromState;
 
   /// Action type identifier.
   @override

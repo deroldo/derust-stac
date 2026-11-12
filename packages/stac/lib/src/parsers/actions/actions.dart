@@ -12,3 +12,4 @@ export 'package:stac/src/parsers/actions/stac_decrement_state/stac_decrement_sta
 export 'package:stac/src/parsers/actions/stac_toggle_state/stac_toggle_state_action_parser.dart';
 export 'package:stac/src/parsers/actions/stac_reset_state/stac_reset_state_action_parser.dart';
 export 'package:stac/src/parsers/actions/stac_append_state/stac_append_state_action_parser.dart';
+export 'package:stac/src/parsers/actions/stac_cancel_request/stac_cancel_request_parser.dart';

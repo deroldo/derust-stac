@@ -109,6 +109,9 @@ class StacMemoryStateStore implements StacStateStore {
   Object? initialOf(String key) => _initials[key];
 
   @override
+  bool isSecure(String key) => false;
+
+  @override
   void dispose() {
     for (final n in _notifiers.values) {
       n.dispose();
