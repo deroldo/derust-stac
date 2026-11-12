@@ -251,3 +251,54 @@ StacRadioGroup(
   </Tab>
 </Tabs>
 
+
+## State binding
+
+Put `bind` on the `radioGroup`, never on an individual `radio` (that is logged as an error and ignored). `groupValue` reads the key and choosing a radio writes that radio's `value` to it before `onChanged` runs (`event.value` is the chosen value). `bind`, `visible` and `enabled` are authored directly in JSON; they have no typed Dart field. See [Reactivity](/concepts/reactivity#bind-on-inputs).
+
+```json
+{
+  "type": "form",
+  "state": {
+    "kind": "a"
+  },
+  "child": {
+    "type": "column",
+    "children": [
+      {
+        "type": "radioGroup",
+        "bind": "kind",
+        "child": {
+          "type": "column",
+          "children": [
+            {
+              "type": "radio",
+              "value": "a"
+            },
+            {
+              "type": "radio",
+              "value": "b"
+            }
+          ]
+        }
+      },
+      {
+        "type": "text",
+        "data": "Form A",
+        "visible": {
+          "$expr": "kind == 'a'"
+        }
+      },
+      {
+        "type": "text",
+        "data": "Form B",
+        "visible": {
+          "$expr": "kind == 'b'"
+        }
+      }
+    ]
+  }
+}
+```
+
+The `radioGroup` must be inside a `form`, as for any radio group.

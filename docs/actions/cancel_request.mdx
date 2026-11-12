@@ -1,0 +1,58 @@
+---
+title: "Cancel Request Action"
+description: "Cancel an in-flight networkRequest by its requestKey"
+---
+
+The `StacCancelRequest` action cancels the in-flight [networkRequest](/actions/network_request) that was started on the current screen with the same `requestKey`. A cancelled request never runs `onSuccess`, `onError` or `onFinally`, and the callbacks it had left are dropped.
+
+## Properties
+
+| Property   | Type     | Description                                          |
+|------------|----------|------------------------------------------------------|
+| requestKey | `String` | **Required.** The `requestKey` of the request to cancel. |
+
+Cancelling a key that has no request in flight does nothing. Requests are tracked per screen, so a key only reaches requests started by the same screen. Starting a new request with the same `requestKey` also cancels the previous one; use `cancelRequest` when you want to cancel without starting another (for example, when the user clears the search box).
+
+## Example
+
+<CodeGroup>
+```dart Dart
+StacCancelRequest(requestKey: 'search')
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "query": "", "results": [] },
+  "children": [
+    {
+      "type": "textField",
+      "bind": "query",
+      "onChanged": {
+        "actionType": "multiAction",
+        "sync": true,
+        "actions": [
+          { "actionType": "cancelRequest", "requestKey": "search" },
+          {
+            "actionType": "networkRequest",
+            "condition": { "$expr": "length(query) >= 3" },
+            "url": "https://example.com/api/search",
+            "queryParameters": { "q": { "$state": "query" } },
+            "requestKey": "search",
+            "onSuccess": {
+              "actionType": "setState",
+              "values": { "results": { "$state": "response.body.items" } }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Cancel" },
+      "onPressed": { "actionType": "cancelRequest", "requestKey": "search" }
+    }
+  ]
+}
+```
+</CodeGroup>

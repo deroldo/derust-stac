@@ -140,3 +140,29 @@ StacSwitch(
 ```
 </CodeGroup>
 
+
+## State binding
+
+`bind` links the switch to a state key: `value` reads it and each toggle writes the new `bool` before `onChanged` runs (`event.value` is that `bool`). `bind`, `visible` and `enabled` are authored directly in JSON; they have no typed Dart field. See [Reactivity](/concepts/reactivity#bind-on-inputs).
+
+```json
+{
+  "type": "column",
+  "state": {
+    "showDetails": false
+  },
+  "children": [
+    {
+      "type": "switch",
+      "bind": "showDetails"
+    },
+    {
+      "type": "text",
+      "data": "Details",
+      "visible": {
+        "$state": "showDetails"
+      }
+    }
+  ]
+}
+```

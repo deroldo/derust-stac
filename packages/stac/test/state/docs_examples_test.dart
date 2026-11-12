@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stac/stac.dart';
@@ -22,6 +25,32 @@ const List<String> docsExamplePages = [
   'docs/actions/append_state.mdx',
   'docs/widgets/text.mdx',
   'docs/widgets/conditional.mdx',
+  // Phase 2: inputs.
+  'docs/widgets/check_box.mdx',
+  'docs/widgets/switch.mdx',
+  'docs/widgets/slider.mdx',
+  'docs/widgets/radio_group.mdx',
+  'docs/widgets/text_field.mdx',
+  'docs/widgets/text_form_field.mdx',
+  'docs/widgets/dropdown_menu.mdx',
+  'docs/widgets/elevated_button.mdx',
+  'docs/widgets/filled_button.mdx',
+  'docs/widgets/outlined_button.mdx',
+  'docs/widgets/text_button.mdx',
+  'docs/widgets/icon_button.mdx',
+  'docs/guides/state_recipes.mdx',
+  // Phase 3: requests and navigation.
+  'docs/actions/network_request.mdx',
+  'docs/actions/cancel_request.mdx',
+  'docs/actions/navigate.mdx',
+  // Phase 4: lists and collection actions.
+  'docs/actions/remove_from_state.mdx',
+  'docs/actions/toggle_item.mdx',
+  'docs/widgets/listview.mdx',
+  'docs/widgets/grid_view.mdx',
+  'docs/widgets/page_view.mdx',
+  'docs/widgets/sliver_list.mdx',
+  'docs/widgets/sliver_grid.mdx',
 ];
 
 /// Pages checked only for valid JSON (their blocks are older examples that are
@@ -33,6 +62,16 @@ const List<String> docsJsonOnlyPages = <String>[];
 const Map<String, Set<int>> docsRenderSkips = {
   // Pre-existing example using an icon name that does not exist.
   'docs/widgets/conditional.mdx': {3},
+  // Older examples of pages that gained a state section: they predate the
+  // state work and need a full app around them (form, theme, scrolling).
+  'docs/widgets/check_box.mdx': {1},
+  'docs/widgets/radio_group.mdx': {1},
+  'docs/widgets/text_form_field.mdx': {2, 3},
+  'docs/widgets/elevated_button.mdx': {1},
+  'docs/widgets/filled_button.mdx': {1},
+  'docs/widgets/outlined_button.mdx': {1},
+  'docs/widgets/text_button.mdx': {1},
+  'docs/widgets/grid_view.mdx': {1},
 };
 
 /// Output of the logger that signals a problem (error or warning).
@@ -83,9 +122,38 @@ Future<List<String>> _captureLogs(Future<void> Function() body) async {
   return lines;
 }
 
+/// Answers every request with the same small JSON document, so documentation
+/// examples that call a backend can run without a network.
+class _DocsAdapter implements HttpClientAdapter {
+  static const Map<String, Object?> body = {
+    'items': [
+      {'id': 1, 'name': 'Ana'},
+    ],
+    'name': 'Ana',
+    'city': 'Rio',
+    'token': 'abc',
+  };
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async => ResponseBody.fromBytes(
+    utf8.encode(jsonEncode(body)),
+    200,
+    headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    },
+  );
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
   setUpAll(() async {
-    await initStacForTest();
+    await initStacForTest(dio: Dio()..httpClientAdapter = _DocsAdapter());
   });
   setUp(() => StacGlobalState.instance.clear());
 
@@ -112,30 +180,38 @@ void main() {
           testWidgets('${example.name} renders without logged problems', (
             tester,
           ) async {
+            final errors = <String>[];
+            final previousOnError = FlutterError.onError;
+            FlutterError.onError = (details) =>
+                errors.add(details.exceptionAsString());
             final logs = await _captureLogs(() async {
               await pumpStac(tester, json);
               await tester.pump();
-              // Exercise the actions: tap every enabled button once.
-              for (final type in const [
-                ElevatedButton,
-                FilledButton,
-                OutlinedButton,
-                TextButton,
-              ]) {
-                final buttons = find.byType(type);
-                for (var i = 0; i < buttons.evaluate().length; i++) {
-                  await tester.tap(buttons.at(i), warnIfMissed: false);
-                  await tester.pump();
+              // Exercise the actions: tap every enabled button, twice, so
+              // flows that open a second screen get their buttons tapped too.
+              for (var round = 0; round < 2; round++) {
+                for (final type in const [
+                  ElevatedButton,
+                  FilledButton,
+                  OutlinedButton,
+                  TextButton,
+                ]) {
+                  final buttons = find.byType(type);
+                  for (var i = 0; i < buttons.evaluate().length; i++) {
+                    await tester.tap(buttons.at(i), warnIfMissed: false);
+                    await tester.pump(const Duration(milliseconds: 100));
+                  }
                 }
               }
             });
+            FlutterError.onError = previousOnError;
             final problems = logs.where(_problemLog.hasMatch).toList();
             expect(
               problems,
               isEmpty,
               reason: '${example.name} logged:\n${logs.join('\n')}',
             );
-            expect(tester.takeException(), isNull);
+            expect(errors, isEmpty, reason: '${example.name} threw');
           });
         }
       }

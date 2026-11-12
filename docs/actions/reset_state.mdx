@@ -13,6 +13,10 @@ The `StacResetStateAction` restores keys to the value they had when they were de
 
 The initial value is the one stored at declaration time, after its own bindings were resolved. Resetting without `keys` affects the screen state only; global keys are reset only when listed explicitly (`"global.token"`). Keys that are not declared are ignored. All resets are batched, so dependent widgets rebuild once.
 
+### Persisted global keys
+
+Resetting a global key that was declared with `persist` or `secure` restores its `initial` value **and erases the copy saved on the device** (or in the secure storage), so it is not restored at the next app start. Writing the key again afterwards saves it again. See [Persisting global state](/concepts/state#persisting-global-state).
+
 ## Example
 
 <CodeGroup>
@@ -39,3 +43,9 @@ StacResetStateAction(keys: ['name', 'accepted'])
 }
 ```
 </CodeGroup>
+
+Reset a persisted global key explicitly:
+
+```json
+{ "actionType": "resetState", "keys": ["global.theme"] }
+```

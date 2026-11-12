@@ -1,0 +1,66 @@
+---
+title: "Toggle Item Action"
+description: "Add an item to a list state key, or remove it if it is already there"
+---
+
+The `StacToggleItemAction` treats a list [state](/concepts/state) key as a set of selected items: if the item is not in the list it is appended, and if it is already there it is removed. It writes a new list, so widgets reading the key are redrawn.
+
+## Properties
+
+| Property | Type       | Description                                                                                                  |
+|----------|------------|--------------------------------------------------------------------------------------------------------------|
+| key      | `String`   | **Required.** State key that holds a list. Accepts the `global.` prefix.                                      |
+| value    | `dynamic`  | The item to toggle: any JSON or a [binding](/concepts/bindings_and_expressions).                              |
+| by       | `String`   | Name of a field used as the identity when the items are objects. Without it items are compared as a whole.    |
+
+Items are compared by deep equality (`3` and `"3"` are different). With `by`, two objects are the same item when their `by` field is equal, even if their other fields differ; the item that is added is the whole `value`. If the key does not hold a list, the action logs an error and changes nothing.
+
+The checkBox in the example below needs a `form` around it, like any checkBox.
+
+Use it together with `contains` to draw selected options: `contains(selected, item, 'id')` is `true` when some selected object has the same `id` as `item`.
+
+## Example
+
+<CodeGroup>
+```dart Dart
+StacToggleItemAction(key: 'selected', value: StacBinding.state('item'), by: 'id')
+```
+
+```json JSON
+{
+  "type": "form",
+  "state": {
+    "selected": [],
+    "options": [
+      { "id": 1, "name": "Cheese" },
+      { "id": 2, "name": "Ham" }
+    ]
+  },
+  "child": {
+    "type": "column",
+    "children": [
+    {
+      "type": "listView",
+      "shrinkWrap": true,
+      "items": { "$state": "options" },
+      "itemTemplate": {
+        "type": "listTile",
+        "title": { "type": "text", "data": { "$state": "item.name" } },
+        "trailing": {
+          "type": "checkBox",
+          "value": { "$expr": "contains(selected, item, 'id')" },
+          "onChanged": {
+            "actionType": "toggleItem",
+            "key": "selected",
+            "value": { "$state": "item" },
+            "by": "id"
+          }
+        }
+      }
+    },
+    { "type": "text", "data": { "$expr": "length(selected) + ' selected'" } }
+    ]
+  }
+}
+```
+</CodeGroup>

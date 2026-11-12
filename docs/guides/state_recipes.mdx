@@ -1,0 +1,422 @@
+---
+title: "State Recipes"
+description: "Ready-to-use JSON recipes for state, bindings, requests, navigation and lists"
+---
+
+Every recipe below is plain Stac JSON that you can serve from your backend. They use only generic names; adapt the keys to your screens. Each one is rendered and exercised by the documentation tests, so it matches what the runtime does. Concepts are explained in [State](/concepts/state), [Bindings and expressions](/concepts/bindings_and_expressions) and [Reactivity](/concepts/reactivity).
+
+## Counter with limits
+
+Two buttons share one key. Each is disabled when its action would go out of range, and `min`/`max` on the actions clamp the value as a second guard.
+
+```json
+{
+  "type": "column",
+  "state": { "total": 0 },
+  "children": [
+    { "type": "text", "data": { "$expr": "'Total: ' + total" } },
+    {
+      "type": "row",
+      "children": [
+        {
+          "type": "elevatedButton",
+          "enabled": { "$expr": "total > 0" },
+          "child": { "type": "text", "data": "-" },
+          "onPressed": { "actionType": "decrementState", "key": "total", "min": 0 }
+        },
+        {
+          "type": "elevatedButton",
+          "enabled": { "$expr": "total < 10" },
+          "child": { "type": "text", "data": "+" },
+          "onPressed": { "actionType": "incrementState", "key": "total", "max": 10 }
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Enable a button with a checkbox
+
+`bind` keeps `accepted` in sync with the checkbox. The button reads the same key in `enabled`, so it stays disabled until the box is checked.
+
+```json
+{
+  "type": "form",
+  "state": { "accepted": false, "done": false },
+  "child": {
+    "type": "column",
+    "children": [
+      { "type": "checkBox", "bind": "accepted" },
+      {
+        "type": "elevatedButton",
+        "enabled": { "$state": "accepted" },
+        "child": { "type": "text", "data": "Continue" },
+        "onPressed": { "actionType": "setState", "values": { "done": true } }
+      },
+      { "type": "text", "data": "Done", "visible": { "$state": "done" } }
+    ]
+  }
+}
+```
+
+## Show or hide a block with a switch
+
+```json
+{
+  "type": "column",
+  "state": { "showDetails": false },
+  "children": [
+    { "type": "switch", "bind": "showDetails" },
+    {
+      "type": "text",
+      "data": "These are the details.",
+      "visible": { "$state": "showDetails" }
+    }
+  ]
+}
+```
+
+## A radio group chooses which form is shown
+
+Put `bind` on the `radioGroup`. Each form is a sibling with its own `visible` expression.
+
+```json
+{
+  "type": "form",
+  "state": { "kind": "person" },
+  "child": {
+    "type": "column",
+    "children": [
+      {
+        "type": "radioGroup",
+        "bind": "kind",
+        "child": {
+          "type": "column",
+          "children": [
+            { "type": "radio", "value": "person" },
+            { "type": "radio", "value": "company" }
+          ]
+        }
+      },
+      { "type": "text", "data": "Person form", "visible": { "$expr": "kind == 'person'" } },
+      { "type": "text", "data": "Company form", "visible": { "$expr": "kind == 'company'" } }
+    ]
+  }
+}
+```
+
+## Validate while typing
+
+Because `bind` writes the text before `onChanged` runs, `length(trim(name))` in the `onChanged` action already counts the character just typed.
+
+```json
+{
+  "type": "column",
+  "state": { "name": "", "valid": false },
+  "children": [
+    {
+      "type": "textField",
+      "bind": "name",
+      "onChanged": {
+        "actionType": "setState",
+        "values": { "valid": { "$expr": "length(trim(name)) >= 3" } }
+      }
+    },
+    { "type": "text", "data": "At least 3 characters", "visible": { "$expr": "!valid" } },
+    {
+      "type": "elevatedButton",
+      "enabled": { "$state": "valid" },
+      "child": { "type": "text", "data": "Save" },
+      "onPressed": { "actionType": "resetState", "keys": ["name", "valid"] }
+    }
+  ]
+}
+```
+
+## An input that triggers a request
+
+Typing a code looks it up and fills two fields. The previous lookup is cancelled and the fields are cleared on every change, `requestKey` makes a late answer harmless, and `onFinally` always turns the spinner off.
+
+```json
+{
+  "type": "column",
+  "state": { "code": "", "name": "", "city": "", "loading": false, "failed": false },
+  "children": [
+    {
+      "type": "textField",
+      "bind": "code",
+      "onChanged": {
+        "actionType": "multiAction",
+        "sync": true,
+        "actions": [
+          { "actionType": "cancelRequest", "requestKey": "lookup" },
+          { "actionType": "resetState", "keys": ["name", "city", "loading", "failed"] },
+          {
+            "actionType": "networkRequest",
+            "condition": { "$expr": "length(code) >= 3" },
+            "url": "https://example.com/api/lookup",
+            "queryParameters": { "code": { "$state": "code" } },
+            "requestKey": "lookup",
+            "onStart": { "actionType": "setState", "values": { "loading": true } },
+            "onSuccess": {
+              "actionType": "setState",
+              "values": {
+                "name": { "$state": "response.body.name" },
+                "city": { "$state": "response.body.city" }
+              }
+            },
+            "onError": { "actionType": "setState", "values": { "failed": true } },
+            "onFinally": { "actionType": "setState", "values": { "loading": false } }
+          }
+        ]
+      }
+    },
+    { "type": "circularProgressIndicator", "visible": { "$state": "loading" } },
+    { "type": "text", "data": "Lookup failed", "visible": { "$state": "failed" } },
+    { "type": "textField", "bind": "name", "enabled": { "$expr": "name == ''" } },
+    { "type": "textField", "bind": "city", "enabled": { "$expr": "city == ''" } }
+  ]
+}
+```
+
+## Global state shared by two screens
+
+`globalState` keys are addressed as `global.<key>`. The second screen changes the key and the first one, still on the stack underneath, redraws.
+
+```json
+{
+  "type": "column",
+  "globalState": { "visits": 0 },
+  "children": [
+    { "type": "text", "data": { "$expr": "'Visits: ' + global.visits" } },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Open" },
+      "onPressed": {
+        "actionType": "navigate",
+        "navigationStyle": "push",
+        "widgetJson": {
+          "type": "column",
+          "children": [
+            {
+              "type": "elevatedButton",
+              "child": { "type": "text", "data": "Count a visit" },
+              "onPressed": { "actionType": "incrementState", "key": "global.visits" }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+## A list fed by a screen that returns a result
+
+The origin screen shows the list and an empty message. It opens a second screen and, only when that screen is closed with a `result`, appends it. Going back without confirming runs `onCancel` and leaves the list alone.
+
+```json
+{
+  "type": "column",
+  "state": { "items": [] },
+  "children": [
+    { "type": "text", "data": "No items yet", "visible": { "$expr": "length(items) == 0" } },
+    {
+      "type": "listView",
+      "shrinkWrap": true,
+      "items": { "$state": "items" },
+      "itemTemplate": {
+        "type": "listTile",
+        "title": { "type": "text", "data": { "$state": "item.name" } },
+        "subtitle": { "type": "text", "data": { "$expr": "'Options: ' + length(item.options)" } },
+        "trailing": {
+          "type": "textButton",
+          "child": { "type": "text", "data": "Remove" },
+          "onPressed": { "actionType": "removeFromState", "key": "items", "index": { "$state": "index" } }
+        }
+      }
+    },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Add item" },
+      "onPressed": {
+        "actionType": "navigate",
+        "navigationStyle": "push",
+        "widgetJson": {
+          "type": "scaffold",
+          "body": {
+            "type": "form",
+            "state": { "name": "", "options": [] },
+            "child": {
+              "type": "column",
+              "children": [
+                { "type": "textField", "bind": "name" },
+                {
+                  "type": "elevatedButton",
+                  "child": { "type": "text", "data": "Pick option" },
+                  "onPressed": {
+                    "actionType": "toggleItem",
+                    "key": "options",
+                    "value": { "id": 1, "label": "First" },
+                    "by": "id"
+                  }
+                },
+                {
+                  "type": "elevatedButton",
+                  "enabled": { "$expr": "length(trim(name)) > 0" },
+                  "child": { "type": "text", "data": "Confirm" },
+                  "onPressed": {
+                    "actionType": "navigate",
+                    "navigationStyle": "pop",
+                    "result": { "name": { "$state": "name" }, "options": { "$state": "options" } }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "onResult": {
+          "actionType": "appendState",
+          "key": "items",
+          "value": { "$state": "result" }
+        },
+        "onCancel": { "actionType": "none" }
+      }
+    }
+  ]
+}
+```
+
+## Send a list and clear it on success
+
+The button is disabled while the request runs. On success the list is cleared; on error it is kept so the user can try again. `bodyFromState` sends the listed keys, here a single list.
+
+```json
+{
+  "type": "column",
+  "state": { "items": [{ "name": "Coffee" }, { "name": "Tea" }], "sending": false, "failed": false },
+  "children": [
+    { "type": "text", "data": { "$expr": "length(items) + ' items'" } },
+    {
+      "type": "elevatedButton",
+      "enabled": { "$expr": "length(items) > 0 && !sending" },
+      "child": { "type": "text", "data": "Send" },
+      "onPressed": {
+        "actionType": "networkRequest",
+        "url": "https://example.com/api/orders",
+        "method": "post",
+        "bodyFromState": ["items"],
+        "onStart": { "actionType": "setState", "values": { "sending": true, "failed": false } },
+        "onSuccess": { "actionType": "setState", "values": { "items": [] } },
+        "onError": { "actionType": "setState", "values": { "failed": true } },
+        "onFinally": { "actionType": "setState", "values": { "sending": false } }
+      }
+    },
+    { "type": "text", "data": "Could not send, try again", "visible": { "$state": "failed" } }
+  ]
+}
+```
+
+## Add and remove list items
+
+A draft field plus `appendState` and `removeFromState`. The two actions run in a synchronous `multiAction` so the draft is cleared after it was appended.
+
+```json
+{
+  "type": "column",
+  "state": { "draft": "", "todos": [] },
+  "children": [
+    { "type": "textField", "bind": "draft" },
+    {
+      "type": "elevatedButton",
+      "enabled": { "$expr": "length(trim(draft)) > 0" },
+      "child": { "type": "text", "data": "Add" },
+      "onPressed": {
+        "actionType": "multiAction",
+        "sync": true,
+        "actions": [
+          { "actionType": "appendState", "key": "todos", "value": { "$state": "draft" } },
+          { "actionType": "setState", "values": { "draft": "" } }
+        ]
+      }
+    },
+    {
+      "type": "listView",
+      "shrinkWrap": true,
+      "items": { "$state": "todos" },
+      "as": "todo",
+      "itemTemplate": {
+        "type": "listTile",
+        "title": { "type": "text", "data": { "$state": "todo" } },
+        "trailing": {
+          "type": "textButton",
+          "child": { "type": "text", "data": "Remove" },
+          "onPressed": { "actionType": "removeFromState", "key": "todos", "index": { "$state": "index" } }
+        }
+      }
+    }
+  ]
+}
+```
+
+## Pick several options
+
+`toggleItem` adds an option to `selected` or removes it, and `contains` tells the template whether to show it as chosen.
+
+```json
+{
+  "type": "form",
+  "state": {
+    "selected": [],
+    "options": [{ "id": 1, "name": "Cheese" }, { "id": 2, "name": "Ham" }]
+  },
+  "child": {
+    "type": "column",
+    "children": [
+      {
+        "type": "listView",
+        "shrinkWrap": true,
+        "items": { "$state": "options" },
+        "itemTemplate": {
+          "type": "listTile",
+          "title": { "type": "text", "data": { "$state": "item.name" } },
+          "trailing": {
+            "type": "checkBox",
+            "value": { "$expr": "contains(selected, item, 'id')" },
+            "onChanged": {
+              "actionType": "toggleItem",
+              "key": "selected",
+              "value": { "$state": "item" },
+              "by": "id"
+            }
+          }
+        }
+      },
+      { "type": "text", "data": { "$expr": "length(selected) + ' selected'" } }
+    ]
+  }
+}
+```
+
+## Remember a preference
+
+A global key declared with `persist` is saved on the device and restored the next time the app starts, before the first screen is built. See [Persisting global state](/concepts/state#persisting-global-state).
+
+```json
+{
+  "type": "column",
+  "globalState": { "theme": { "initial": "light", "persist": true } },
+  "children": [
+    { "type": "text", "data": { "$expr": "'Theme: ' + global.theme" } },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Toggle theme" },
+      "onPressed": {
+        "actionType": "setState",
+        "values": { "global.theme": { "$expr": "global.theme == 'light' ? 'dark' : 'light'" } }
+      }
+    }
+  ]
+}
+```

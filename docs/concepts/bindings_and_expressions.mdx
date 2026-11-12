@@ -52,6 +52,16 @@ The first name of a path is looked up in this order:
 
 Local variables win over screen keys, which is why those names are reserved and cannot be declared as keys: `global`, `params`, `result`, `response`, `event`.
 
+Local variables exist only where they make sense:
+
+| Variable   | Available in                                                                 | Value                                                                                  |
+|------------|------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| `event`    | The action of an input's `onChanged` / `onSelected` (and actions it runs)    | `event.value` is the new value: `bool` for checkBox and switch, `double` for slider, the chosen `value` for radioGroup and dropdownMenu, the text for textField and textFormField. |
+| `item`, `index` | The `itemTemplate` of a list, grid, page view or sliver, and the actions it triggers | The current entry and its position. Rename them with `as` and `indexAs`.          |
+| `params`   | A screen opened by [navigate](/actions/navigate#params) with `params`        | A snapshot of the values sent by the origin screen.                                    |
+| `result`   | The `onResult` action of a [navigate](/actions/navigate#onresult)            | The value the closed screen returned.                                                  |
+| `response` | `onSuccess`, `onError` and `onFinally` of a [networkRequest](/actions/network_request#the-response-variable) | `response.body`, `response.statusCode`, `response.headers`.  |
+
 An unknown key reads as `null`. Reading a field of `null`, or a missing field of an object, also yields `null`.
 
 ## Expression language

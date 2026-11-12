@@ -129,3 +129,39 @@ StacTextField(
     </Frame>
   </Tab>
 </Tabs>
+
+
+## State binding
+
+`bind` links the field to a text state key. Every change writes the typed text to the key (`event.value` is the text) and then runs `onChanged`, so a condition in `onChanged` already sees the new text. When the key is changed from elsewhere, the field text is replaced only if it differs from the key, so typing never loses focus or moves the cursor. A number or `bool` in the key is shown as text, and `null` as empty. `enabled` and `visible` accept bindings. `bind`, `visible` and `enabled` are authored directly in JSON; they have no typed Dart field. See [Reactivity](/concepts/reactivity#bind-on-inputs).
+
+```json
+{
+  "type": "column",
+  "state": {
+    "search": "",
+    "ready": false
+  },
+  "children": [
+    {
+      "type": "textField",
+      "bind": "search",
+      "maxLength": 20,
+      "onChanged": {
+        "actionType": "setState",
+        "values": {
+          "ready": {
+            "$expr": "length(search) >= 3"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "data": {
+        "$expr": "ready ? 'Searching ' + search : 'Type 3 or more characters'"
+      }
+    }
+  ]
+}
+```

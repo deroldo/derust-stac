@@ -71,6 +71,10 @@ To know more about the GridView widget in Flutter, refer to the [official docume
 | addSemanticIndexes      | `bool`                                  | Whether to add semantic indexes. Defaults to `true`.                                                                                 |
 | cacheExtent             | `double`                                | The extent to which the content is cached.                                                                                           |
 | children                | `List<StacWidget>`                      | The widgets below this widget in the tree. Defaults to an empty list.                                                                |
+| items | `List<dynamic>` or binding | The data to repeat `itemTemplate` for. See [Item templates](#item-templates). |
+| itemTemplate | `StacWidget` | Widget built once per entry of `items`; used instead of `children` when present. |
+| as | `String` | Variable name of the current item inside the template. Defaults to `item`. |
+| indexAs | `String` | Variable name of the current position inside the template. Defaults to `index`. |
 | semanticChildCount      | `int`                                   | The number of children for semantics purposes.                                                                                       |
 | dragStartBehavior       | `StacDragStartBehavior`                 | The drag start behavior. Defaults to `DragStartBehavior.start`.                                                                      |
 | keyboardDismissBehavior | `StacScrollViewKeyboardDismissBehavior` | The keyboard dismiss behavior. Defaults to `ScrollViewKeyboardDismissBehavior.manual`.                                               |
@@ -191,3 +195,66 @@ StacGridView(
     </Frame>
   </Tab>
 </Tabs>
+
+
+## Item templates
+
+`items` and `itemTemplate` build the grid from a list instead of a fixed `children` array. With `items` bound to a [state](/concepts/state) list, adding, removing or replacing entries (for example with [appendState](/actions/append_state) or [removeFromState](/actions/remove_from_state)) redraws it.
+
+| Property     | Description |
+|--------------|-------------|
+| `items`      | A list, usually a [binding](/concepts/bindings_and_expressions) such as `{ "$state": "todos" }`. `null` renders nothing; any other non-list value renders nothing and logs a warning. |
+| `itemTemplate` | The widget repeated for every entry. It wins over `children` when both are present. |
+| `as`         | Variable name for the current entry. Default `item`. |
+| `indexAs`    | Variable name for the current position, starting at 0. Default `index`. |
+
+Rules:
+
+- **Scope.** Inside the template (and in the actions it triggers) `item` and `index` can be used in any binding: `item.name`, `index + 1`, `{ "$state": "item" }`. They are lexically scoped, so a nested list sees the variables of both lists. Use different names with `as` / `indexAs` in nested lists; repeating a name hides the outer one.
+- **The template belongs to the item, not to the list.** The list resolves its own `items`; every template instance resolves its own bindings against its own `item`.
+- **Identity is the position.** Entries are not tracked by an id: when the list changes, the widget at position N is rebuilt with the entry now at position N.
+- **Snapshot.** Each item sees the entry as it was when the list was built. A later change to the list redraws the items.
+- **Lazy.** Items are built as they scroll into view, so long lists stay cheap.
+- **Empty list.** There is no empty template. Show a sibling with `visible` instead: `"visible": { "$expr": "length(todos) == 0" }`.
+- **Legacy `children`** keep working exactly as before when `itemTemplate` is absent.
+
+### Example
+
+```json
+{
+  "type": "column",
+  "state": {
+    "tiles": [
+      "a",
+      "b",
+      "c",
+      "d"
+    ]
+  },
+  "children": [
+    {
+      "type": "sizedBox",
+      "height": 200,
+      "child": {
+        "type": "gridView",
+        "crossAxisCount": 2,
+        "items": {
+          "$state": "tiles"
+        },
+        "itemTemplate": {
+          "type": "card",
+          "child": {
+            "type": "center",
+            "child": {
+              "type": "text",
+              "data": {
+                "$expr": "index + ':' + item"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+```

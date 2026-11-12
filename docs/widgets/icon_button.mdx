@@ -192,3 +192,39 @@ StacIconButton(
     </Frame>
   </Tab>
 </Tabs>
+
+
+## State binding
+
+`visible` and `enabled` accept a `bool` or a [binding](/concepts/bindings_and_expressions). While `visible` resolves to `false` the button is not built; while `enabled` resolves to `false` the touch actions (`onPressed`, `onLongPress`) are removed and Flutter draws the button disabled. A value that is not a real `bool` counts as `false`. See [Reactivity](/concepts/reactivity#enabling-and-disabling-with-enabled).
+
+```json
+{
+  "type": "column",
+  "state": {
+    "total": 0
+  },
+  "children": [
+    {
+      "type": "iconButton",
+      "icon": {
+        "type": "icon",
+        "icon": "add"
+      },
+      "enabled": {
+        "$expr": "total < 3"
+      },
+      "onPressed": {
+        "actionType": "incrementState",
+        "key": "total"
+      }
+    },
+    {
+      "type": "text",
+      "data": {
+        "$expr": "'Total: ' + total"
+      }
+    }
+  ]
+}
+```

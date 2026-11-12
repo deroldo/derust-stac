@@ -101,6 +101,10 @@ To learn more about Flutter’s `SliverGrid`, refer to the
 | addRepaintBoundaries   | `bool?`                       | Whether to wrap children in repaint boundaries. Defaults to `true`.         |
 | addSemanticIndexes     | `bool?`                       | Whether to add semantic indexes for children. Defaults to `true`.           |
 | children               | `List<Map<String, dynamic>>?` | The list of widgets rendered as grid items.                                 |
+| items | `List<dynamic>` or binding | The data to repeat `itemTemplate` for. See [Item templates](#item-templates). |
+| itemTemplate | `StacWidget` | Widget built once per entry of `items`; used instead of `children` when present. |
+| as | `String` | Variable name of the current item inside the template. Defaults to `item`. |
+| indexAs | `String` | Variable name of the current position inside the template. Defaults to `index`. |
 
 > ⚠️ **Note**
 >
@@ -289,3 +293,72 @@ const StacCustomScrollView(
     </Frame>
   </Tab>
 </Tabs>
+
+
+## Item templates
+
+`items` and `itemTemplate` build the sliver grid from a list instead of a fixed `children` array. With `items` bound to a [state](/concepts/state) list, adding, removing or replacing entries (for example with [appendState](/actions/append_state) or [removeFromState](/actions/remove_from_state)) redraws it.
+
+| Property     | Description |
+|--------------|-------------|
+| `items`      | A list, usually a [binding](/concepts/bindings_and_expressions) such as `{ "$state": "todos" }`. `null` renders nothing; any other non-list value renders nothing and logs a warning. |
+| `itemTemplate` | The widget repeated for every entry. It wins over `children` when both are present. |
+| `as`         | Variable name for the current entry. Default `item`. |
+| `indexAs`    | Variable name for the current position, starting at 0. Default `index`. |
+
+Rules:
+
+- **Scope.** Inside the template (and in the actions it triggers) `item` and `index` can be used in any binding: `item.name`, `index + 1`, `{ "$state": "item" }`. They are lexically scoped, so a nested list sees the variables of both lists. Use different names with `as` / `indexAs` in nested lists; repeating a name hides the outer one.
+- **The template belongs to the item, not to the list.** The list resolves its own `items`; every template instance resolves its own bindings against its own `item`.
+- **Identity is the position.** Entries are not tracked by an id: when the list changes, the widget at position N is rebuilt with the entry now at position N.
+- **Snapshot.** Each item sees the entry as it was when the list was built. A later change to the list redraws the items.
+- **Lazy.** Items are built as they scroll into view, so long lists stay cheap.
+- **Empty list.** There is no empty template. Show a sibling with `visible` instead: `"visible": { "$expr": "length(todos) == 0" }`.
+- **Legacy `children`** keep working exactly as before when `itemTemplate` is absent.
+- Place the sliver inside the `slivers` of a `customScrollView`; the template must be a box widget.
+
+### Example
+
+```json
+{
+  "type": "column",
+  "state": {
+    "names": [
+      "Ana",
+      "Bia",
+      "Cris",
+      "Dani"
+    ]
+  },
+  "children": [
+    {
+      "type": "sizedBox",
+      "height": 200,
+      "child": {
+        "type": "customScrollView",
+        "slivers": [
+          {
+            "type": "sliverGrid",
+            "crossAxisCount": 2,
+            "items": {
+              "$state": "names"
+            },
+            "itemTemplate": {
+              "type": "card",
+              "child": {
+                "type": "center",
+                "child": {
+                  "type": "text",
+                  "data": {
+                    "$state": "item"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
+```

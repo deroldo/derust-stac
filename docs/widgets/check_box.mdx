@@ -130,3 +130,50 @@ StacCheckBox(
     </Frame>
   </Tab>
 </Tabs>
+
+
+## State binding
+
+`bind` links the checkbox to a [state](/concepts/state) key: `value` reads the key and every tap writes the new `bool` back before `onChanged` runs. Inside `onChanged`, `event.value` is the new value. Changing the key from elsewhere (for example with `setState`) updates the checkbox without firing `onChanged`. `bind`, `visible` and `enabled` are authored directly in JSON; they have no typed Dart field. See [Reactivity](/concepts/reactivity#bind-on-inputs).
+
+`visible` hides the widget while it resolves to `false`; `enabled: false` removes `onChanged`, so the checkbox is drawn disabled and ignores taps.
+
+```json
+{
+  "type": "form",
+  "state": {
+    "accepted": false
+  },
+  "child": {
+    "type": "column",
+    "children": [
+      {
+        "type": "checkBox",
+        "bind": "accepted"
+      },
+      {
+        "type": "text",
+        "data": "Terms accepted",
+        "visible": {
+          "$state": "accepted"
+        }
+      },
+      {
+        "type": "elevatedButton",
+        "enabled": {
+          "$state": "accepted"
+        },
+        "child": {
+          "type": "text",
+          "data": "Continue"
+        },
+        "onPressed": {
+          "actionType": "none"
+        }
+      }
+    ]
+  }
+}
+```
+
+The checkbox must be inside a `form`, as for any checkbox.

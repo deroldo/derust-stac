@@ -7,7 +7,7 @@ The **Navigate** action performs navigation in a Flutter app from JSON or Dart. 
 
 ## Property reference
 
-You specify **where** to go with exactly one of: `request`, `widgetJson`, `assetPath`, or `routeName`. You specify **how** to go with `navigationStyle`. For pop-style navigation only `navigationStyle` (and optionally `result`) is used.
+You specify **where** to go with exactly one of: `request`, `widgetJson`, `assetPath`, or `routeName`. You specify **how** to go with `navigationStyle`. For pop-style navigation only `navigationStyle` (and optionally `result`) is used. `params`, `onResult` and `onCancel` are described below.
 
 ### request
 
@@ -97,14 +97,58 @@ Controls how the navigation is performed: push, pop, replace, or clear stack. Wh
 
 | | |
 |---|---|
-| **Type** | `Map<String, dynamic>` |
+| **Type** | any JSON, or a [binding](/concepts/bindings_and_expressions) |
 | **Required** | No |
 | **JSON key** | `result` |
 
-Data returned to the previous route when the current route is removed.
+Data returned to the previous route when the current route is removed. It may be a map, a list, a number, text, a `bool`, `null` or a binding, and bindings inside it are resolved when the action runs (in the screen that pops).
 
 - **`pop`**: passed as the second argument to `Navigator.pop(context, result)`.
 - **`pushReplacement`** / **`pushReplacementNamed`**: passed as the `result` to the replacement call so the previous route receives it when the new route is later popped.
+
+The runtime tells "a result was given" apart from "no result" by whether the `result` key is present in the JSON. `"result": null` is a result (it runs `onResult` with `result` equal to `null`); omitting the key is not.
+
+---
+
+### params
+
+| | |
+|---|---|
+| **Type** | `Map<String, dynamic>` |
+| **Required** | No |
+| **JSON key** | `params` |
+
+Values handed to the destination screen. They are resolved when the action runs and copied (a snapshot): changing the state of the origin screen afterwards does not change what the destination sees. In the destination, every [binding](/concepts/bindings_and_expressions) can read them as `params.<name>`, including the initial values of its `state`.
+
+- Works with `request`, `widgetJson`, `assetPath` and `routeName` on `push`, `pushReplacement` and `pushAndRemoveAll`.
+- With the Flutter named-route styles (`pushNamed`, `pushReplacementNamed`, `pushNamedAndRemoveAll`) Stac does not build the screen, so it cannot provide `params` as a variable. They are delivered inside `arguments` under the key `__stacParams`, and your app's route builder is responsible for reading them (and, for example, wrapping the screen it builds). Treat `params` with named routes as a limitation: prefer `routeName` with `push` for Stac screens.
+- `params` is a local variable, not a state key. To keep a value, copy it into state with `setState` from the destination's `onInit`.
+
+---
+
+### onResult
+
+| | |
+|---|---|
+| **Type** | `StacAction` (use a `multiAction` for several) |
+| **Required** | No |
+| **JSON key** | `onResult` |
+
+Runs on the origin screen when the pushed route is popped **with a result** (`navigationStyle: pop` and a `result` key). The value is available as `result` to the bindings of this action. Bindings are evaluated against the origin screen's state, at the moment the result arrives.
+
+It runs only for styles that push a route (`push`, `pushReplacement`, `pushAndRemoveAll` and the named variants), and only if the origin screen is still mounted; if it was already replaced or closed it is skipped silently.
+
+---
+
+### onCancel
+
+| | |
+|---|---|
+| **Type** | `StacAction` |
+| **Required** | No |
+| **JSON key** | `onCancel` |
+
+Runs on the origin screen when the pushed route is closed **without a result**: the system back button or gesture, or a `pop` with no `result` key. `onResult` does not run in that case, and `onCancel` does not run when a result was given.
 
 ---
 
@@ -116,6 +160,77 @@ Data returned to the previous route when the current route is removed.
 | **Required** | No |
 | **JSON key** | `arguments` |
 
-Arguments passed to the new route. For **Stac screens** (push/pushReplacement/pushAndRemoveAll + routeName), the Stac runtime can use these when building the screen. For **Flutter named routes** (pushNamed, pushReplacementNamed, pushNamedAndRemoveAll), this is the `arguments` object passed to `Navigator.pushNamed(..., arguments: arguments)`.
+Arguments passed to the new route. For **Flutter named routes** (pushNamed, pushReplacementNamed, pushNamedAndRemoveAll), this is the `arguments` object passed to `Navigator.pushNamed(..., arguments: arguments)`. Stac screens (`push`, `pushReplacement`, `pushAndRemoveAll`) do not read `arguments`; use [`params`](#params) to hand values to them.
+
+## Passing params and getting a result
+
+The origin screen sends `params`; the destination reads them as `params.*` and pops with a `result`; the origin reacts in `onResult`.
+
+<CodeGroup>
+```dart Dart
+StacNavigateAction(
+  navigationStyle: NavigationStyle.push,
+  widgetJson: {
+    'type': 'column',
+    'children': [
+      {'type': 'text', 'data': StacBinding.state('params.name')},
+    ],
+  },
+  params: {'name': StacBinding.state('product')},
+  onResult: {
+    'actionType': 'appendState',
+    'key': 'picked',
+    'value': StacBinding.state('result'),
+  },
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "product": "Coffee", "picked": [] },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Choose" },
+      "onPressed": {
+        "actionType": "navigate",
+        "navigationStyle": "push",
+        "params": { "name": { "$state": "product" } },
+        "widgetJson": {
+          "type": "column",
+          "state": { "qty": 1 },
+          "children": [
+            { "type": "text", "data": { "$expr": "'Buy ' + params.name" } },
+            {
+              "type": "elevatedButton",
+              "child": { "type": "text", "data": "Confirm" },
+              "onPressed": {
+                "actionType": "navigate",
+                "navigationStyle": "pop",
+                "result": { "name": { "$state": "params.name" }, "qty": { "$state": "qty" } }
+              }
+            }
+          ]
+        },
+        "onResult": {
+          "actionType": "appendState",
+          "key": "picked",
+          "value": { "$state": "result" }
+        },
+        "onCancel": { "actionType": "none" }
+      }
+    },
+    { "type": "text", "data": { "$expr": "length(picked) + ' picked'" } }
+  ]
+}
+```
+</CodeGroup>
+
+Notes on this flow:
+
+- Each time the destination is opened it starts with fresh state; nothing is left over from the previous visit.
+- Both screens can read and write [global state](/concepts/state#global-state) (`global.*`); a change made on the destination is visible on the origin screen underneath it right away.
+- `Navigator.push` itself still returns a future to code that awaits it, and that value is the plain result (`null` on cancel).
 
 For examples (Dart and JSON), see [Navigation in Stac](/concepts/navigation_in_stac#examples).

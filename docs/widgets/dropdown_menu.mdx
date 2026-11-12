@@ -203,3 +203,39 @@ StacDropdownMenu(
     </Frame>
   </Tab>
 </Tabs>
+
+
+## State binding
+
+`bind` links the menu to a state key: `initialSelection` reads it and choosing an entry writes that entry's `value` before `onSelected` runs (`event.value` is the entry value). Changing the key from elsewhere changes the selection without firing `onSelected`. `enabled` here is the widget's native property and accepts a binding. `bind`, `visible` and `enabled` are authored directly in JSON; they have no typed Dart field. See [Reactivity](/concepts/reactivity#bind-on-inputs).
+
+```json
+{
+  "type": "column",
+  "state": {
+    "fruit": "apple"
+  },
+  "children": [
+    {
+      "type": "dropdownMenu",
+      "bind": "fruit",
+      "dropdownMenuEntries": [
+        {
+          "value": "apple",
+          "label": "Apple"
+        },
+        {
+          "value": "pear",
+          "label": "Pear"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "data": {
+        "$expr": "'Selected: ' + fruit"
+      }
+    }
+  ]
+}
+```

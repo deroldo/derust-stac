@@ -196,4 +196,39 @@ StacNavigator.pushAndRemoveAllStac('home_screen')
 ```
 </CodeGroup>
 
+## Passing values between screens
+
+Navigation can carry data in both directions without a request in between. See [State](/concepts/state) for the stores themselves.
+
+| Direction | Property | How the other screen reads it |
+|-----------|----------|-------------------------------|
+| Origin to destination | `params` | As `params.<name>` in any [binding](/concepts/bindings_and_expressions), including the destination's initial `state`. A snapshot taken when the action runs. |
+| Destination to origin | `result` on a `pop` | As `result` inside the origin's `onResult` action. |
+| Closed without a result | (none) | The origin's `onCancel` action runs instead. |
+| Any screen to any screen | `global.*` keys | Through [global state](/concepts/state#global-state); screens stacked underneath redraw when a global key changes. |
+
+```json
+{
+  "actionType": "navigate",
+  "routeName": "pick_item",
+  "params": { "category": { "$state": "category" } },
+  "onResult": { "actionType": "appendState", "key": "items", "value": { "$state": "result" } },
+  "onCancel": { "actionType": "none" }
+}
+```
+
+How the three outcomes are told apart:
+
+- `pop` with a `result` key (even `"result": null`) completes the pushed route with a result and runs `onResult`.
+- `pop` without `result`, the system back button or a back gesture count as a cancellation and run `onCancel`.
+- If the origin screen no longer exists when the route closes (for example it was replaced with `pushReplacement`), neither handler runs and nothing fails.
+
+`onResult` and `onCancel` are single actions; use a `multiAction` for several steps. Both are evaluated against the origin screen's state.
+
+<Note>
+`params` only reach Stac screens (`push`, `pushReplacement`, `pushAndRemoveAll`). With the Flutter named-route styles Stac does not build the screen, so the values travel in `arguments` under `__stacParams` and the app's route builder has to read them.
+</Note>
+
+Dialogs and bottom sheets opened by [dialog](/actions/dialog) and [modalBottomSheet](/actions/modal_bottom_sheet) can read and write the state of the screen that opened them, although they are built under the navigator.
+
 For full property details, see the [Navigate Action](/actions/navigate) reference.

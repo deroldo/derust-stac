@@ -145,3 +145,36 @@ StacScaffold(
     </Frame>
   </Tab>
 </Tabs>
+
+
+## State binding
+
+`bind` links the slider to a numeric state key: `value` reads it and `onChanged` (called while dragging) writes the new `double` first, so `event.value` and the key hold the same number. `onChangeStart` and `onChangeEnd` do not receive `event`. Keep the initial value within `min` and `max`. `bind`, `visible` and `enabled` are authored directly in JSON; they have no typed Dart field. See [Reactivity](/concepts/reactivity#bind-on-inputs).
+
+```json
+{
+  "type": "form",
+  "state": {
+    "volume": 3
+  },
+  "child": {
+    "type": "column",
+    "children": [
+      {
+        "type": "slider",
+        "bind": "volume",
+        "min": 0,
+        "max": 10
+      },
+      {
+        "type": "text",
+        "data": {
+          "$expr": "'Volume: ' + volume"
+        }
+      }
+    ]
+  }
+}
+```
+
+The slider must be inside a `form`, as for any slider.

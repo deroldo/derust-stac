@@ -142,11 +142,87 @@ StacWidget(
 ```
 </CodeGroup>
 
-Address global keys with the `global.` prefix, both in bindings (`global.userName`) and in actions (`"key": "global.userName"`). Persisted keys are loaded before the first screen is built. Only global keys can be persisted: `persist` or `secure` on a screen key is logged and ignored, and the key keeps its `initial` value.
+Address global keys with the `global.` prefix, both in bindings (`global.userName`) and in actions (`"key": "global.userName"`).
 
-<Note>
-On web there is no platform secure storage; `secure` keys fall back to a no-op with a warning.
-</Note>
+## Persisting global state
+
+Only global keys can be persisted. Mark a key with `persist` to keep it on the device, or with `secure` to keep it in the platform secure storage (Keychain on iOS and macOS, Keystore on Android). Both flags are written in the declaration object shown above.
+
+```json
+{
+  "type": "column",
+  "globalState": {
+    "theme": { "initial": "light", "persist": true },
+    "token": { "initial": "", "secure": true }
+  },
+  "children": [
+    { "type": "text", "data": { "$expr": "'Theme: ' + global.theme" } }
+  ]
+}
+```
+
+### How values are restored
+
+When a key is declared, its value is chosen in this order:
+
+1. **Memory.** If the key already has a value in this session, it is kept (declaration is idempotent).
+2. **Persisted.** Otherwise the value saved on the device, if there is one and it is valid.
+3. **Initial.** Otherwise the `initial` of the declaration.
+
+Details:
+
+- Persisted values are loaded by `Stac.initialize` before it returns, so await it before `runApp`: the first screen never sees `null` for a persisted key and never waits for storage.
+- A persisted value for a key that no screen has declared yet stays hidden. It appears as soon as a screen declares the key.
+- If the persisted value does not match the type of the declared `initial` (a number where text was declared, for example), or cannot be decoded, it is discarded, erased from storage, and the `initial` is used. An `initial` of `null` accepts any type.
+- Every change is saved as JSON. Several changes in the same moment are coalesced into one write with the last value. A storage error is logged and never breaks the screen.
+- [`resetState`](/actions/reset_state) on a persisted global key restores `initial` and erases the saved copy.
+
+### Limits
+
+- The value must be JSON (numbers, text, booleans, lists, objects, `null`). A value that cannot be encoded is logged and not saved.
+- `persist` and `secure` on a **screen** key are ignored with a warning; the key keeps its `initial` and is not saved.
+- The flags come from the first declaration of the key in the session. Declaring it again with other flags does not change them.
+- `secure` implies `persist`. `secure` together with `"persist": false` logs a warning and the key is persisted anyway.
+- There is no expiry, no migration of old values and no encryption beyond what the platform secure storage gives.
+
+### Secure values
+
+A `secure` key is meant for tokens and similar data:
+
+- It is stored in the secure storage, never in `shared_preferences`.
+- In the diagnostics where Stac may print state values (binding warnings, request errors, the debug error widget with the widget JSON), every text that equals a secure value is replaced by `***`. The match is by text, so a very short secret (such as `1`) also hides that text elsewhere in the output. Your own UI is not affected: a `text` bound to the key shows the real value.
+- `bodyFromState` leaves secure keys out of the request body and logs a warning. Secure values are never added to `params` automatically.
+- You can still use a secure key explicitly, for example in a header: `"Authorization": { "$expr": "'Bearer ' + global.token" }`.
+- On web there is no secure storage. The key behaves as a normal in-memory key (it is not saved) and a warning is logged once.
+
+### Storage and tests
+
+By default `persist` keys use `shared_preferences` (entries prefixed `stac_state.`) and `secure` keys use `flutter_secure_storage`. Both can be replaced by passing implementations of `StacStatePersistence` (`readAll`, `write`, `delete`, with text values) to `Stac.initialize`:
+
+```dart
+await Stac.initialize(
+  statePersistence: MyPrefsPersistence(),
+  secureStatePersistence: MySecurePersistence(),
+);
+```
+
+<Warning>
+In a Flutter widget test that calls `Stac.initialize`, always pass `statePersistence` and `secureStatePersistence` (an in-memory fake or a class that stores nothing). The default storages use platform channels, whose real asynchrony never completes inside `testWidgets`, so the test would hang while `initialize` waits to load the state.
+</Warning>
+
+## State across screens
+
+Screen state belongs to one screen; two screens never share it. To move values between screens:
+
+- **Global state.** Declare the key in `globalState` on any screen and read or write it as `global.<key>` anywhere. Screens that are stacked below the current one redraw when a global key changes.
+- **`params`.** [`navigate`](/actions/navigate#params) copies the values when it runs; the destination reads them as `params.<name>`, including in its initial `state`.
+- **`result`.** A `navigate` with `navigationStyle: pop` and a `result` hands a value back to the origin's `onResult` (`result.<field>`). Closing the route without a result runs `onCancel`.
+
+See [Navigation in Stac](/concepts/navigation_in_stac#passing-values-between-screens).
+
+## State and requests
+
+[networkRequest](/actions/network_request#request-with-state) can write state in `onStart`, `onSuccess`, `onError` and `onFinally`, reads the answer as `response.body`, and can send state with `bodyFromState`. Requests started by a screen are cancelled when that screen is disposed, and a request with a `requestKey` is replaced by a newer one with the same key, so a late answer never overwrites newer state.
 
 ## Changing state
 

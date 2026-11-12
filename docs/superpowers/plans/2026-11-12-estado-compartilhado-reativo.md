@@ -345,7 +345,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 11: Docs da Fase 2
+### Task 11: Docs da Fase 2 [CONCLUIDA]
 
 **Dificuldade:** simples. **Depende de:** T8, T9, T10.
 
@@ -407,7 +407,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 14: Docs da Fase 3
+### Task 14: Docs da Fase 3 [CONCLUIDA]
 
 **Dificuldade:** simples. **Depende de:** T12, T13.
 
@@ -450,7 +450,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 17: Docs da Fase 4
+### Task 17: Docs da Fase 4 [CONCLUIDA]
 
 **Dificuldade:** simples. **Depende de:** T16.
 **Files:** Create `docs/actions/{remove_from_state,toggle_item}.mdx`; Modify `docs/widgets/{list_view,grid_view,page_view,sliver_list,sliver_grid}.mdx` (templates, `as`/`indexAs`, escopo lexico, identidade por indice), `docs/guides/state_recipes.mdx`, `docs/docs.json`.

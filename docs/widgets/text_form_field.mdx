@@ -265,3 +265,32 @@ StacTextFormField(
     </Frame>
   </Tab>
 </Tabs>
+
+
+## State binding
+
+`textFormField` binds exactly like [textField](/widgets/text_field#state-binding): `bind` writes the text to the key on every change before `onChanged` runs, with `event.value` as the text, and external writes update the field without moving the cursor. `bind`, `visible` and `enabled` are authored directly in JSON; they have no typed Dart field. See [Reactivity](/concepts/reactivity#bind-on-inputs).
+
+```json
+{
+  "type": "form",
+  "state": {
+    "email": ""
+  },
+  "child": {
+    "type": "column",
+    "children": [
+      {
+        "type": "textFormField",
+        "bind": "email"
+      },
+      {
+        "type": "text",
+        "data": {
+          "$expr": "'Email: ' + email"
+        }
+      }
+    ]
+  }
+}
+```

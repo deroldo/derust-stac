@@ -57,6 +57,7 @@
                         "icon": "map",
                         "pages": [
                             "guides/migration",
+                            "guides/state_recipes",
                             "guides/troubleshooting"
                         ]
                     }
@@ -204,7 +205,8 @@
                     {
                         "group": "Network Actions",
                         "pages": [
-                            "actions/network_request"
+                            "actions/network_request",
+                            "actions/cancel_request"
                         ]
                     },
                     {
@@ -216,7 +218,9 @@
                             "actions/decrement_state",
                             "actions/toggle_state",
                             "actions/reset_state",
-                            "actions/append_state"
+                            "actions/append_state",
+                            "actions/remove_from_state",
+                            "actions/toggle_item"
                         ]
                     },
                     {

@@ -16,6 +16,12 @@ The `StacNetworkRequest` class is used to make network requests in Stac applicat
 | contentType     | `String?`                  | The content type of the request.                                                 |
 | body            | `dynamic`                  | The body of the request.                                                         |
 | results         | `List<StacNetworkResult>` | The list of results to handle different status codes. Defaults to an empty list. |
+| onStart         | `StacAction` or `List<StacAction>` | Runs before the request is sent. |
+| onSuccess       | `StacAction` or `List<StacAction>` | Runs when the status is 2xx. `response` is available to bindings. |
+| onError         | `StacAction` or `List<StacAction>` | Runs on a non-2xx status, a connection failure or a timeout. `response` is available. |
+| onFinally       | `StacAction` or `List<StacAction>` | Runs after `onSuccess` or `onError`, whichever ran. |
+| requestKey      | `String?`                  | Names the request on the current screen so a newer call (or [cancelRequest](/actions/cancel_request)) can cancel it. |
+| bodyFromState   | `List<String>?`            | State keys sent as the body, as a `{key: value}` map. |
 
 ### Method
 
@@ -46,7 +52,136 @@ A result's action can read the response body with `{{response}}` placeholders. T
 - A value that's only a placeholder keeps its type, such as a map or a number. A placeholder inside longer text, such as `"Hi {{response.user.name}}"`, is inserted as text.
 - A placeholder whose path isn't in the body is left unchanged.
 
-[Chaining with Network Request](/actions/set_value#chaining-with-network-request) shows how to store the response with `setValue`.
+[Chaining with Network Request](/actions/set_value#chaining-with-network-request) shows how to store the response with `setValue`. To keep the response in [state](/concepts/state) instead, use the lifecycle callbacks below.
+
+## Request with state
+
+`onStart`, `onSuccess`, `onError` and `onFinally` take one action or a list. A list runs in order and each action is awaited before the next one. They run in this order:
+
+1. `onStart`, then the request is sent.
+2. `onSuccess` when the status is 2xx, otherwise `onError`.
+3. `onFinally`.
+4. The legacy `results` entry that matches the status code (see above), if any.
+
+Any `condition` on the request, and any [binding](/concepts/bindings_and_expressions) in `url`, `queryParameters`, `headers` and `body`, is evaluated when the action is triggered, before the request leaves. State written afterwards does not change a request that is already in flight. Bindings inside the callbacks are evaluated when each callback runs.
+
+### The response variable
+
+Inside `onSuccess`, `onError`, `onFinally` (and the nested actions they run) the local variable `response` is available:
+
+| Path                | Value                                                                                      |
+|---------------------|--------------------------------------------------------------------------------------------|
+| `response.body`     | The decoded body (JSON is decoded; text that is not JSON stays text). `null` without a response. |
+| `response.statusCode` | The HTTP status, or `null` when there was no response (no connection, timeout).          |
+| `response.headers`  | Map of header name to a list of values.                                                    |
+
+`response` is a local variable, not a state key (the name is reserved, so it cannot be declared in `state`). A 2xx response is never routed to `onError`, even if its body describes a failure; check the body with a `condition` inside `onSuccess`.
+
+### Ordering and cancellation
+
+- A request that gets a `requestKey` is tracked on its screen. Starting another request with the same key cancels the previous one the moment the new one is triggered, so the order of calls decides which response counts, not the order the responses arrive. A cancelled request never runs `onSuccess`, `onError` or `onFinally`, and its remaining callbacks are dropped.
+- Requests with different keys (or no key) do not cancel each other.
+- [cancelRequest](/actions/cancel_request) cancels a key explicitly.
+- When the screen that triggered the request is closed, the request is cancelled or its response is discarded: nothing runs and nothing is written to state, even for requests without a key.
+
+### bodyFromState
+
+`bodyFromState` lists state keys (`name`, `global.token`) whose values are read at trigger time and sent as a map `{key: value}`, using the full key as written (`global.token` stays `global.token`). Keys declared `secure` in `globalState` are left out with a warning. An explicit `body` wins over `bodyFromState`. To send a secure value deliberately, put it in `headers` or `body` with a binding, as in the example below.
+
+### Example with state
+
+<CodeGroup>
+```dart Dart
+StacNetworkRequest(
+  url: 'https://example.com/api/users',
+  method: Method.get,
+  requestKey: 'users',
+  onStart: StacSetStateAction(values: {'loading': true, 'failed': false}),
+  onSuccess: StacSetStateAction(
+    values: {'users': StacBinding.state('response.body.items')},
+  ),
+  onError: StacSetStateAction(values: {'failed': true}),
+  onFinally: StacSetStateAction(values: {'loading': false}),
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "users": [], "loading": false, "failed": false },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "enabled": { "$expr": "!loading" },
+      "child": { "type": "text", "data": "Load" },
+      "onPressed": {
+        "actionType": "networkRequest",
+        "url": "https://example.com/api/users",
+        "method": "get",
+        "requestKey": "users",
+        "onStart": {
+          "actionType": "setState",
+          "values": { "loading": true, "failed": false }
+        },
+        "onSuccess": {
+          "actionType": "setState",
+          "values": { "users": { "$state": "response.body.items" } }
+        },
+        "onError": { "actionType": "setState", "values": { "failed": true } },
+        "onFinally": { "actionType": "setState", "values": { "loading": false } }
+      }
+    },
+    { "type": "circularProgressIndicator", "visible": { "$state": "loading" } },
+    { "type": "text", "data": "Could not load", "visible": { "$state": "failed" } },
+    {
+      "type": "text",
+      "data": { "$expr": "length(users) + ' users'" }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+### Example sending state
+
+<CodeGroup>
+```dart Dart
+StacNetworkRequest(
+  url: 'https://example.com/api/profile',
+  method: Method.post,
+  headers: {
+    'Authorization': StacBinding.expr("'Bearer ' + global.token"),
+  },
+  bodyFromState: ['name', 'accepted'],
+  onSuccess: StacSetStateAction(values: {'saved': true}),
+)
+```
+
+```json JSON
+{
+  "type": "column",
+  "globalState": { "token": { "initial": "abc", "secure": true } },
+  "state": { "name": "Ana", "accepted": true, "saved": false },
+  "children": [
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Save" },
+      "onPressed": {
+        "actionType": "networkRequest",
+        "url": "https://example.com/api/profile",
+        "method": "post",
+        "headers": {
+          "Authorization": { "$expr": "'Bearer ' + global.token" }
+        },
+        "bodyFromState": ["name", "accepted"],
+        "onSuccess": { "actionType": "setState", "values": { "saved": true } }
+      }
+    },
+    { "type": "text", "data": "Saved", "visible": { "$state": "saved" } }
+  ]
+}
+```
+</CodeGroup>
 
 ## Example
 

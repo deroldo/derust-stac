@@ -200,6 +200,10 @@ To know more about the listview widget in Flutter, refer to the [official docume
 | addSemanticIndexes      | `bool`                                  | Determines whether semantic indexes are assigned to the children, enabling accessibility tools to understand the order and structure of the list items. |
 | cacheExtent             | `double`                                | The viewport has an area before and after the visible area to cache items that are about to become visible when the user scrolls.                       |
 | children                | `List<StacWidget>`                      | The widgets below this widget in the tree.                                                                                                              |
+| items | `List<dynamic>` or binding | The data to repeat `itemTemplate` for. See [Item templates](#item-templates). |
+| itemTemplate | `StacWidget` | Widget built once per entry of `items`; used instead of `children` when present. |
+| as | `String` | Variable name of the current item inside the template. Defaults to `item`. |
+| indexAs | `String` | Variable name of the current position inside the template. Defaults to `index`. |
 | separator               | `StacWidget`                            | Defines a widget, to display between each pair of list items.                                                                                           |
 | semanticChildCount      | `int`                                   | The number of children that will contribute semantic information.                                                                                       |
 | dragStartBehavior       | `StacDragStartBehavior`                 | Determines the way that drag start behavior is handled.                                                                                                 |
@@ -483,3 +487,104 @@ StacListView(
   </Tab>
 </Tabs>
 
+
+## Item templates
+
+`items` and `itemTemplate` build the list from a list instead of a fixed `children` array. With `items` bound to a [state](/concepts/state) list, adding, removing or replacing entries (for example with [appendState](/actions/append_state) or [removeFromState](/actions/remove_from_state)) redraws it.
+
+| Property     | Description |
+|--------------|-------------|
+| `items`      | A list, usually a [binding](/concepts/bindings_and_expressions) such as `{ "$state": "todos" }`. `null` renders nothing; any other non-list value renders nothing and logs a warning. |
+| `itemTemplate` | The widget repeated for every entry. It wins over `children` when both are present. |
+| `as`         | Variable name for the current entry. Default `item`. |
+| `indexAs`    | Variable name for the current position, starting at 0. Default `index`. |
+
+Rules:
+
+- **Scope.** Inside the template (and in the actions it triggers) `item` and `index` can be used in any binding: `item.name`, `index + 1`, `{ "$state": "item" }`. They are lexically scoped, so a nested list sees the variables of both lists. Use different names with `as` / `indexAs` in nested lists; repeating a name hides the outer one.
+- **The template belongs to the item, not to the list.** The list resolves its own `items`; every template instance resolves its own bindings against its own `item`.
+- **Identity is the position.** Entries are not tracked by an id: when the list changes, the widget at position N is rebuilt with the entry now at position N.
+- **Snapshot.** Each item sees the entry as it was when the list was built. A later change to the list redraws the items.
+- **Lazy.** Items are built as they scroll into view, so long lists stay cheap.
+- **Empty list.** There is no empty template. Show a sibling with `visible` instead: `"visible": { "$expr": "length(todos) == 0" }`.
+- **Legacy `children`** keep working exactly as before when `itemTemplate` is absent.
+- **Separator.** `separator` is drawn between template items too.
+
+### Example
+
+```json
+{
+  "type": "column",
+  "state": {
+    "todos": [
+      {
+        "id": 1,
+        "name": "Buy milk"
+      },
+      {
+        "id": 2,
+        "name": "Walk dog"
+      }
+    ]
+  },
+  "children": [
+    {
+      "type": "text",
+      "data": "Nothing to do",
+      "visible": {
+        "$expr": "length(todos) == 0"
+      }
+    },
+    {
+      "type": "listView",
+      "shrinkWrap": true,
+      "items": {
+        "$state": "todos"
+      },
+      "as": "todo",
+      "indexAs": "i",
+      "itemTemplate": {
+        "type": "listTile",
+        "title": {
+          "type": "text",
+          "data": {
+            "$expr": "(i + 1) + '. ' + todo.name"
+          }
+        },
+        "trailing": {
+          "type": "textButton",
+          "child": {
+            "type": "text",
+            "data": "Done"
+          },
+          "onPressed": {
+            "actionType": "removeFromState",
+            "key": "todos",
+            "index": {
+              "$state": "i"
+            }
+          }
+        }
+      },
+      "separator": {
+        "type": "divider"
+      }
+    },
+    {
+      "type": "elevatedButton",
+      "child": {
+        "type": "text",
+        "data": "Add"
+      },
+      "onPressed": {
+        "actionType": "appendState",
+        "key": "todos",
+        "value": {
+          "id": 3,
+          "name": "New task"
+        }
+      }
+    }
+  ]
+}
+```

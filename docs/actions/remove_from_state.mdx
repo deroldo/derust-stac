@@ -1,0 +1,69 @@
+---
+title: "Remove From State Action"
+description: "Remove an item from a list state key by index or by value"
+---
+
+The `StacRemoveFromStateAction` removes one item from a list [state](/concepts/state) key. It writes a new list, so widgets reading the key (such as a list with an `itemTemplate`) are redrawn.
+
+## Properties
+
+| Property | Type                          | Description                                                                                     |
+|----------|-------------------------------|-------------------------------------------------------------------------------------------------|
+| key      | `String`                      | **Required.** State key that holds a list. Accepts the `global.` prefix.                         |
+| index    | `int` or binding              | Position of the item to remove (starting at 0).                                                  |
+| value    | `dynamic`                     | Item to remove, compared by deep equality. Only the first match is removed.                      |
+
+Give `index` or `value`. When both are present, `index` wins. Both may be [bindings](/concepts/bindings_and_expressions), resolved when the action runs; inside a list template, `{ "$state": "index" }` is the position of the current item.
+
+Nothing is removed, and a warning is logged, when:
+
+- the key does not hold a list;
+- `index` is not a whole number, is negative, or is past the end of the list;
+- `value` is not found in the list.
+
+To remove a value only if it is there without the warning, add a `condition` such as `contains(tags, 'green')`, as in the example.
+
+## Example
+
+<CodeGroup>
+```dart Dart
+StacRemoveFromStateAction(key: 'tags', index: StacBinding.state('index'))
+```
+
+```json JSON
+{
+  "type": "column",
+  "state": { "tags": ["red", "green", "blue"] },
+  "children": [
+    {
+      "type": "listView",
+      "shrinkWrap": true,
+      "items": { "$state": "tags" },
+      "itemTemplate": {
+        "type": "listTile",
+        "title": { "type": "text", "data": { "$state": "item" } },
+        "trailing": {
+          "type": "textButton",
+          "child": { "type": "text", "data": "Remove" },
+          "onPressed": {
+            "actionType": "removeFromState",
+            "key": "tags",
+            "index": { "$state": "index" }
+          }
+        }
+      }
+    },
+    {
+      "type": "elevatedButton",
+      "child": { "type": "text", "data": "Remove green" },
+      "onPressed": {
+        "actionType": "removeFromState",
+        "condition": { "$expr": "contains(tags, 'green')" },
+        "key": "tags",
+        "value": "green"
+      }
+    }
+  ]
+}
+```
+</CodeGroup>
