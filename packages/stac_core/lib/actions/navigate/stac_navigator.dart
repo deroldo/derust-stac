@@ -35,7 +35,7 @@ class StacNavigator {
   /// Pops the current route off the navigator stack.
   ///
   /// Optionally pass a [result] to return to the previous route.
-  static StacNavigateAction pop({Map<String, dynamic>? result}) {
+  static StacNavigateAction pop({Object? result}) {
     return StacNavigateAction(
       navigationStyle: NavigationStyle.pop,
       result: result,

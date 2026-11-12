@@ -72,7 +72,11 @@ class StacNavigateAction extends StacAction {
     this.routeName,
     this.navigationStyle,
     this.result,
+    this.hasResult = false,
     this.arguments,
+    this.params,
+    this.onResult,
+    this.onCancel,
   });
 
   /// Optional network request to load destination widget JSON.
@@ -90,11 +94,32 @@ class StacNavigateAction extends StacAction {
   /// How navigation should be performed.
   final NavigationStyle? navigationStyle;
 
-  /// A result to pass back when popping.
-  final Map<String, dynamic>? result;
+  /// A result to pass back when popping. Any JSON value; may contain state
+  /// bindings, evaluated when the action runs.
+  final Object? result;
+
+  /// Whether the JSON declared `result` at all (even as `null`).
+  ///
+  /// A `pop` with a declared result (including an explicit `null`) completes
+  /// the origin's `onResult`; a `pop` without one is a cancellation.
+  /// Derived from the JSON key; not serialized.
+  @JsonKey(includeToJson: false, readValue: _readHasResult)
+  final bool hasResult;
 
   /// Arguments to pass to the new route.
   final Map<String, dynamic>? arguments;
+
+  /// Values handed to the destination screen, readable there as `params.*`.
+  /// Evaluated (and copied) when the action runs.
+  final Map<String, dynamic>? params;
+
+  /// Action (or `multiAction`) run on the origin when the destination pops
+  /// with a result. The value is available as `result`.
+  final Map<String, dynamic>? onResult;
+
+  /// Action run on the origin when the destination is closed without a
+  /// result (back button, gesture, `pop` without `result`).
+  final Map<String, dynamic>? onCancel;
 
   /// Action type identifier.
   @override
@@ -106,5 +131,13 @@ class StacNavigateAction extends StacAction {
 
   /// Converts this [StacNavigateAction] instance to a JSON map.
   @override
-  Map<String, dynamic> toJson() => _$StacNavigateActionToJson(this);
+  Map<String, dynamic> toJson() {
+    final json = _$StacNavigateActionToJson(this);
+    // An undeclared result must not become an explicit `result: null`.
+    if (!hasResult && result == null) json.remove('result');
+    return json;
+  }
+
+  static Object? _readHasResult(Map<dynamic, dynamic> json, String key) =>
+      json.containsKey('result');
 }

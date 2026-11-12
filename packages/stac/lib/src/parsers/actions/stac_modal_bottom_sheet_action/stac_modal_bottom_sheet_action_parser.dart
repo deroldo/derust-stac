@@ -5,6 +5,8 @@ import 'package:stac/src/framework/framework.dart';
 import 'package:stac/src/parsers/core/stac_widget_parser.dart';
 import 'package:stac/src/parsers/foundation/borders/stac_border_parser.dart';
 import 'package:stac/src/parsers/foundation/geometry/stac_box_constraints_parser.dart';
+import 'package:stac/src/state/stac_pop_result.dart';
+import 'package:stac/src/state/stac_scope.dart';
 import 'package:stac/src/utils/color_utils.dart';
 import 'package:stac_core/stac_core.dart';
 import 'package:stac_framework/stac_framework.dart';
@@ -26,31 +28,31 @@ class StacModalBottomSheetActionParser
       return _showModalBottomSheet(
         context,
         model,
-        model.widget?.parse(context) ?? const SizedBox(),
+        (c) => model.widget?.parse(c) ?? const SizedBox(),
       );
     } else if (model.assetPath?.isNotEmpty ?? false) {
-      return _showModalBottomSheet(
-        context,
-        model,
-        Stac.fromAssets(model.assetPath!),
-      );
+      final widget = Stac.fromAssets(model.assetPath!);
+      return _showModalBottomSheet(context, model, (_) => widget);
     } else if (model.request != null) {
-      return _showModalBottomSheet(
-        context,
-        model,
-        Stac.fromNetwork(context: context, request: model.request!),
+      final widget = Stac.fromNetwork(
+        context: context,
+        request: model.request!,
       );
+      return _showModalBottomSheet(context, model, (_) => widget);
     }
   }
 
   Future _showModalBottomSheet(
     BuildContext context,
     StacModalBottomSheetAction model,
-    Widget widget,
+    WidgetBuilder content,
   ) {
+    // The sheet lives under the Navigator, outside the screen: hand it the
+    // screen's state and local variables so its bindings keep working.
+    final reprovide = StacStateScope.reprovider(context);
     return showModalBottomSheet(
       context: context,
-      builder: (context) => widget,
+      builder: (_) => reprovide(Builder(builder: content)),
       backgroundColor: model.backgroundColor.toColor(context),
       barrierLabel: model.barrierLabel,
       elevation: model.elevation,
@@ -63,6 +65,6 @@ class StacModalBottomSheetActionParser
       enableDrag: model.enableDrag ?? true,
       showDragHandle: model.showDragHandle,
       useSafeArea: model.useSafeArea ?? false,
-    );
+    ).then(StacPopResult.unwrap);
   }
 }

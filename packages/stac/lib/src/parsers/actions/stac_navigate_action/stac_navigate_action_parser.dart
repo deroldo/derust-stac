@@ -2,8 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:stac/src/framework/framework.dart';
+import 'package:stac/src/state/stac_action_vars.dart';
+import 'package:stac/src/state/stac_pop_result.dart';
+import 'package:stac/src/state/stac_scope.dart';
 import 'package:stac_core/stac_core.dart';
 import 'package:stac_framework/stac_framework.dart';
+
+/// Key under which `params` travel in `arguments` for named routes (the app's
+/// own route builder is responsible for reading it).
+const String stacParamsArgumentKey = '__stacParams';
 
 class StacNavigateActionParser extends StacActionParser<StacNavigateAction> {
   const StacNavigateActionParser();
@@ -17,13 +24,43 @@ class StacNavigateActionParser extends StacActionParser<StacNavigateAction> {
 
   @override
   FutureOr onCall(BuildContext context, StacNavigateAction model) {
-    Widget? widget;
+    final params = model.params == null ? null : _deepCopy(model.params);
+    final destination = _destination(context, model);
+    final future = _navigate(
+      context: context,
+      navigationStyle: model.navigationStyle ?? NavigationStyle.push,
+      routeName: model.routeName,
+      result: model.hasResult ? StacPopResult(model.result) : null,
+      arguments: _argumentsWith(model.arguments, params),
+      builder: destination == null
+          ? null
+          : (routeContext) {
+              final built = destination(routeContext);
+              return params == null
+                  ? built
+                  : StacLocalScope(vars: {'params': params}, child: built);
+            },
+    );
+    if (future == null) return null;
+    return _awaitResult(context, model, future);
+  }
+
+  /// Builds the destination under the route's own context, so bindings and
+  /// themes resolve there (and see `params`), not at the origin.
+  static WidgetBuilder? _destination(
+    BuildContext origin,
+    StacNavigateAction model,
+  ) {
     if (model.widgetJson != null) {
-      widget = Stac.fromJson(model.widgetJson, context);
+      return (context) =>
+          Stac.fromJson(model.widgetJson, context) ?? const SizedBox();
     } else if (model.request != null) {
-      widget = Stac.fromNetwork(context: context, request: model.request!);
+      // Created once (the request starts now), not on every route rebuild.
+      final widget = Stac.fromNetwork(context: origin, request: model.request!);
+      return (_) => widget;
     } else if (model.assetPath != null) {
-      widget = Stac.fromAssets(model.assetPath!);
+      final widget = Stac.fromAssets(model.assetPath!);
+      return (_) => widget;
     } else if (model.routeName != null &&
         (model.navigationStyle == null ||
             model.navigationStyle == NavigationStyle.push ||
@@ -31,48 +68,76 @@ class StacNavigateActionParser extends StacActionParser<StacNavigateAction> {
             model.navigationStyle == NavigationStyle.pushAndRemoveAll)) {
       // If a routeName is provided and we're using a push-style navigation,
       // render the remote screen using the Stac(routeName) widget.
-      widget = Stac(routeName: model.routeName!);
+      return (_) => Stac(routeName: model.routeName!);
     }
-    return _navigate(
-      context: context,
-      navigationStyle: model.navigationStyle ?? NavigationStyle.push,
-      routeName: model.routeName,
-      result: model.result,
-      arguments: model.arguments,
-      widget: widget,
-    );
+    return null;
   }
 
-  static Future<dynamic>? _navigate<T extends Object?>({
+  static Map<String, dynamic>? _argumentsWith(
+    Map<String, dynamic>? arguments,
+    Object? params,
+  ) {
+    if (params == null) return arguments;
+    return {...?arguments, stacParamsArgumentKey: params};
+  }
+
+  /// D10: only a [StacPopResult] runs `onResult`; a bare `null` is a
+  /// cancellation. The returned future completes with the unwrapped value
+  /// (what callers got before `StacPopResult` existed).
+  static Future<dynamic> _awaitResult(
+    BuildContext origin,
+    StacNavigateAction model,
+    Future<dynamic> pushed,
+  ) async {
+    final raw = await pushed;
+    final value = StacPopResult.unwrap(raw);
+    if (!origin.mounted) return value;
+    final handler = raw is StacPopResult ? model.onResult : model.onCancel;
+    if (handler == null) return value;
+    if (raw is StacPopResult) {
+      await runWithStacActionVars({'result': value}, () async {
+        await Stac.onCallFromJson(handler, origin);
+      });
+    } else {
+      await Stac.onCallFromJson(handler, origin);
+    }
+    return value;
+  }
+
+  static dynamic _deepCopy(Object? value) {
+    if (value is Map) {
+      return {for (final e in value.entries) e.key: _deepCopy(e.value)};
+    }
+    if (value is List) return [for (final v in value) _deepCopy(v)];
+    return value;
+  }
+
+  static Future<dynamic>? _navigate({
     required BuildContext context,
     NavigationStyle navigationStyle = NavigationStyle.push,
-    Widget? widget,
+    WidgetBuilder? builder,
     String? routeName,
-    T? result,
-    T? arguments,
+    Object? result,
+    Map<String, dynamic>? arguments,
   }) {
+    Route<dynamic> route() =>
+        MaterialPageRoute(builder: builder ?? (_) => const SizedBox());
+
     switch (navigationStyle) {
       case NavigationStyle.push:
-        return Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => widget ?? const SizedBox()),
-        );
+        return Navigator.push(context, route());
 
       case NavigationStyle.pop:
         Navigator.pop(context, result);
         break;
 
       case NavigationStyle.pushReplacement:
-        return Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => widget ?? const SizedBox()),
-          result: result,
-        );
+        return Navigator.pushReplacement(context, route(), result: result);
 
       case NavigationStyle.pushAndRemoveAll:
         return Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => widget ?? const SizedBox()),
+          route(),
           ModalRoute.withName('/'),
         );
 

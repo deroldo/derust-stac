@@ -58,9 +58,11 @@ bool _sameVars(Map<String, Object?> a, Map<String, Object?> b) {
   return true;
 }
 
-/// One [CancelToken] per request key (used by networkRequest).
+/// One [CancelToken] per request key (used by networkRequest), plus the
+/// tokens of keyless requests, so that closing the screen cancels them all.
 class StacRequestRegistry {
   final Map<String, CancelToken> _tokens = {};
+  final Set<CancelToken> _anonymous = {};
 
   /// Cancels the in-flight request with [key] (if any) and returns a fresh
   /// token for the new one.
@@ -69,12 +71,41 @@ class StacRequestRegistry {
     return _tokens[key] = CancelToken();
   }
 
+  /// Token for a request without key; released by [finish].
+  CancelToken beginAnonymous() {
+    final token = CancelToken();
+    _anonymous.add(token);
+    return token;
+  }
+
+  /// Cancels the in-flight request with [key]. Returns whether one existed.
+  bool cancel(String key) {
+    final token = _tokens.remove(key);
+    if (token == null) return false;
+    token.cancel('cancelRequest');
+    return true;
+  }
+
+  /// Releases [token] once its request is over (no-op if it was superseded
+  /// by a newer request with the same key).
+  void finish(String? key, CancelToken token) {
+    if (key != null && identical(_tokens[key], token)) _tokens.remove(key);
+    _anonymous.remove(token);
+  }
+
   void cancelAll() {
     for (final t in _tokens.values) {
       t.cancel('disposed');
     }
+    for (final t in _anonymous) {
+      t.cancel('disposed');
+    }
     _tokens.clear();
+    _anonymous.clear();
   }
+
+  @visibleForTesting
+  int get pendingCount => _tokens.length + _anonymous.length;
 }
 
 class _StacStateInherited extends InheritedWidget {
@@ -123,6 +154,31 @@ class StacStateScope extends StatefulWidget {
       _orphanRequests;
 
   static final StacRequestRegistry _orphanRequests = StacRequestRegistry();
+
+  /// Captures the scopes visible at [origin] (screen store and local
+  /// variables) and returns a function that re-provides them around a widget
+  /// built elsewhere, such as the content of a dialog or bottom sheet (which
+  /// lives under the Navigator, outside the screen). Nothing is owned or
+  /// disposed here: the stores belong to the origin screen.
+  static Widget Function(Widget child) reprovider(BuildContext origin) {
+    final inherited = origin
+        .getInheritedWidgetOfExactType<_StacStateInherited>();
+    final locals = StacLocalScope.varsOf(origin);
+    return (child) {
+      var result = child;
+      if (locals.isNotEmpty) {
+        result = StacLocalScope(vars: locals, child: result);
+      }
+      if (inherited != null) {
+        result = _StacStateInherited(
+          store: inherited.store,
+          requests: inherited.requests,
+          child: result,
+        );
+      }
+      return result;
+    };
+  }
 
   @override
   State<StacStateScope> createState() => _StacStateScopeState();
