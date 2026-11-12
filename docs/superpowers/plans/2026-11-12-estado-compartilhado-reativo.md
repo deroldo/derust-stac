@@ -81,7 +81,7 @@ Paralelas: T1||T2; T5||T6; T8||T9||T10; T12||T13; T15 pode comecar junto de T12/
 
 ---
 
-### Task 1: Linguagem de expressoes
+### Task 1: Linguagem de expressoes [CONCLUIDA]
 
 **Dificuldade:** complexo. **Depende de:** nada. **Paralela com:** T2.
 
