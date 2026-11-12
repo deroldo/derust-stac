@@ -35,4 +35,22 @@ enum ActionType {
 
   /// Wait for a specified duration before proceeding.
   delay,
+
+  /// Write several state keys at once.
+  setState,
+
+  /// Increment a numeric state key.
+  incrementState,
+
+  /// Decrement a numeric state key.
+  decrementState,
+
+  /// Toggle a boolean state key.
+  toggleState,
+
+  /// Reset state keys to their initial values.
+  resetState,
+
+  /// Append a value to a list state key.
+  appendState,
 }

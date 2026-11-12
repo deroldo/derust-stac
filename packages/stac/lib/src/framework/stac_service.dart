@@ -24,7 +24,7 @@ import 'package:stac/src/state/stac_envelope.dart';
 import 'package:stac/src/state/stac_reactive.dart';
 import 'package:stac/src/state/stac_scope.dart';
 import 'package:stac/src/utils/variable_resolver.dart';
-import 'package:stac_core/stac_core.dart';
+import 'package:stac_core/stac_core.dart' hide StacBinding;
 import 'package:stac_framework/stac_framework.dart';
 import 'package:stac_logger/stac_logger.dart';
 
@@ -162,6 +162,12 @@ class StacService {
     const StacSetValueActionParser(),
     const StacMultiActionParser(),
     const StacDelayActionParser(),
+    const StacSetStateActionParser(),
+    const StacIncrementStateActionParser(),
+    const StacDecrementStateActionParser(),
+    const StacToggleStateActionParser(),
+    const StacResetStateActionParser(),
+    const StacAppendStateActionParser(),
   ];
 
   static StacOptions? _options;

@@ -235,7 +235,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 5: Actions de mutacao (fase 1)
+### Task 5: Actions de mutacao (fase 1) [CONCLUIDA]
 
 **Dificuldade:** medio. **Depende de:** T4. **Paralela com:** T6.
 

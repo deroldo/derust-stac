@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:stac/stac.dart';
+import 'package:stac/src/state/stac_binding.dart';
+import 'package:stac/stac.dart' hide StacBinding;
 
 import 'harness.dart';
 

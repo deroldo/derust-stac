@@ -6,3 +6,9 @@ export 'package:stac/src/parsers/actions/stac_navigate_action/stac_navigate_acti
 export 'package:stac/src/parsers/actions/stac_none_action/stac_none_action_parser.dart';
 export 'package:stac/src/parsers/actions/stac_set_value/stac_set_value_action_parser.dart';
 export 'package:stac/src/parsers/actions/stac_snack_bar/stac_snack_bar_parser.dart';
+export 'package:stac/src/parsers/actions/stac_set_state/stac_set_state_action_parser.dart';
+export 'package:stac/src/parsers/actions/stac_increment_state/stac_increment_state_action_parser.dart';
+export 'package:stac/src/parsers/actions/stac_decrement_state/stac_decrement_state_action_parser.dart';
+export 'package:stac/src/parsers/actions/stac_toggle_state/stac_toggle_state_action_parser.dart';
+export 'package:stac/src/parsers/actions/stac_reset_state/stac_reset_state_action_parser.dart';
+export 'package:stac/src/parsers/actions/stac_append_state/stac_append_state_action_parser.dart';
