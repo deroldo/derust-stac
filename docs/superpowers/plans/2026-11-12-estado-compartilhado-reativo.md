@@ -115,7 +115,7 @@ class StacExpression {
 
 ---
 
-### Task 2: Stores de estado (tela e global)
+### Task 2: Stores de estado (tela e global) [CONCLUIDA]
 
 **Dificuldade:** medio. **Depende de:** nada. **Paralela com:** T1.
 
