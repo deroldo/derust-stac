@@ -251,6 +251,9 @@ class StacService {
           ? json
           : resolveVariablesInJson(json, StacRegistry.instance);
 
+      if (_hasScreenBlocks(resolvedJson)) {
+        return _buildScreenScope(stacParser, widgetType, resolvedJson);
+      }
       return _buildWidget(context, stacParser, widgetType, resolvedJson);
     } catch (e, stackTrace) {
       return _onWidgetError(
@@ -261,6 +264,50 @@ class StacService {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  static const List<String> _screenBlockKeys = [
+    'state',
+    'globalState',
+    'onInit',
+  ];
+
+  static bool _hasScreenBlocks(Map<String, dynamic> json) =>
+      _screenBlockKeys.any(json.containsKey);
+
+  /// A node with `state`/`globalState`/`onInit` owns a screen state scope.
+  /// The scope's key is the content of those blocks (D11), so an identical
+  /// re-render keeps the state and different blocks start a new scope. The
+  /// node itself is built below the scope, with the blocks removed.
+  static Widget _buildScreenScope(
+    StacParser parser,
+    String type,
+    Map<String, dynamic> json,
+  ) {
+    final blocks = {
+      for (final key in _screenBlockKeys)
+        if (json.containsKey(key)) key: json[key],
+    };
+    final inner = Map<String, dynamic>.of(json)
+      ..removeWhere((key, _) => _screenBlockKeys.contains(key));
+    return StacStateScope(
+      key: ValueKey(jsonEncode(blocks).hashCode),
+      initialState: _blockMap(blocks['state'], 'state'),
+      globalState: _blockMap(blocks['globalState'], 'globalState'),
+      onInit: blocks['onInit'],
+      child: Builder(
+        builder: (context) =>
+            _buildWidget(context, parser, type, inner) ??
+            const SizedBox.shrink(),
+      ),
+    );
+  }
+
+  static Map<String, Object?> _blockMap(Object? value, String name) {
+    if (value == null) return const {};
+    if (value is Map) return Map<String, Object?>.from(value);
+    Log.e('"$name" must be an object, got $value; ignored');
+    return const {};
   }
 
   /// Applies the state layer (`bind`, bindings, `visible`, `enabled`) on top

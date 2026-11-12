@@ -259,7 +259,7 @@ class StacReactive extends StatelessWidget { // ListenableBuilder(Listenable.mer
 
 ---
 
-### Task 6: Ligacao com a tela (blocos `state`/`globalState`/`onInit`, reload, `conditional`, `text`)
+### Task 6: Ligacao com a tela (blocos `state`/`globalState`/`onInit`, reload, `conditional`, `text`) [CONCLUIDA]
 
 **Dificuldade:** medio. **Depende de:** T4. **Paralela com:** T5.
 

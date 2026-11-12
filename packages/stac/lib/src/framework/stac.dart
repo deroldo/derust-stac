@@ -315,8 +315,19 @@ class Stac extends StatelessWidget {
   }
 }
 
-/// Internal stateless widget that handles fetching and rendering Stac screens.
-class _StacView extends StatelessWidget {
+/// Replaces the screen fetch in tests.
+@visibleForTesting
+Future<Response?> Function(String routeName)? debugStacScreenFetcher;
+
+/// Internal widget that fetches a Stac screen once and renders it.
+///
+/// The fetch happens in `initState` (and again only if [routeName] changes),
+/// not on every build, so a rebuild of the parent (e.g. a theme switch) keeps
+/// the rendered screen and its state. The fetch goes through the configured
+/// cache strategy (`networkFirst` by default: network, falling back to cache),
+/// which yields a single response per call; a new response therefore only
+/// comes from a new fetch (new route or a new [Stac] element).
+class _StacView extends StatefulWidget {
   const _StacView({
     required this.routeName,
     this.loadingWidget,
@@ -328,25 +339,56 @@ class _StacView extends StatelessWidget {
   final Widget? errorWidget;
 
   @override
-  Widget build(BuildContext context) {
-    final options = StacService.options;
-    if (options == null) {
+  State<_StacView> createState() => _StacViewState();
+}
+
+class _StacViewState extends State<_StacView> {
+  late Future<Response?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _fetch();
+  }
+
+  @override
+  void didUpdateWidget(_StacView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.routeName != widget.routeName) {
+      _future = _fetch();
+    }
+  }
+
+  Future<Response?> _fetch() {
+    if (StacService.options == null) {
       throw Exception('StacOptions is not set');
     }
+    final fetcher = debugStacScreenFetcher;
+    return fetcher != null
+        ? fetcher(widget.routeName)
+        : StacCloud.fetchScreen(routeName: widget.routeName);
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return FutureBuilder<Response?>(
-      future: StacCloud.fetchScreen(routeName: routeName),
+      future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return loadingWidget ?? const _LoadingWidget();
+          return widget.loadingWidget ?? const _LoadingWidget();
         }
         if (snapshot.hasError) {
-          return errorWidget ?? const SizedBox();
+          return widget.errorWidget ?? const SizedBox();
         }
         if (snapshot.hasData) {
           final jsonString = snapshot.data!.data['stacJson'];
-          return StacService.fromJson(jsonDecode(jsonString), context) ??
-              const SizedBox();
+          // New response (new fetch) = new key = fresh screen state (D11).
+          return KeyedSubtree(
+            key: ObjectKey(snapshot.data),
+            child:
+                StacService.fromJson(jsonDecode(jsonString), context) ??
+                const SizedBox(),
+          );
         }
         return const SizedBox();
       },

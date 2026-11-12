@@ -8,7 +8,7 @@ part of 'stac_conditional.dart';
 
 StacConditional _$StacConditionalFromJson(Map<String, dynamic> json) =>
     StacConditional(
-      condition: json['condition'] as String,
+      condition: json['condition'],
       ifTrue: StacWidget.fromJson(json['ifTrue'] as Map<String, dynamic>),
       ifFalse: json['ifFalse'] == null
           ? null

@@ -3,11 +3,14 @@ import 'dart:collection';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:stac/src/framework/stac_service.dart';
 import 'package:stac/src/state/expression/stac_expression.dart';
 import 'package:stac/src/state/stac_action_vars.dart';
+import 'package:stac/src/state/stac_binding.dart';
 import 'package:stac/src/state/stac_global_state.dart';
 import 'package:stac/src/state/stac_memory_state_store.dart';
 import 'package:stac/src/state/stac_state_store.dart';
+import 'package:stac_logger/stac_logger.dart';
 
 /// Lexical variables (`item`, `index`, `params`, ...). Merges with the
 /// enclosing [StacLocalScope]; inner variables shadow outer ones.
@@ -93,14 +96,20 @@ class StacStateScope extends StatefulWidget {
   const StacStateScope({
     required this.initialState,
     required this.child,
+    this.globalState = const {},
     this.onInit,
     super.key,
   });
 
-  /// Keys declared when the scope is created.
+  /// Keys declared when the scope is created. Values may hold bindings over
+  /// `params`/`global`; they are resolved once, at creation.
   final Map<String, Object?> initialState;
 
-  /// Executed by the screen binding (Task 6); not run here.
+  /// `globalState` block (D12), declared idempotently before [initialState].
+  final Map<String, Object?> globalState;
+
+  /// One action or a list of actions (list = `multiAction` with `sync`),
+  /// run once after the first frame, with a context below this scope.
   final Object? onInit;
 
   final Widget child;
@@ -127,8 +136,51 @@ class _StacStateScopeState extends State<StacStateScope> {
   void initState() {
     super.initState();
     _store = StacMemoryStateStore();
-    widget.initialState.forEach(_store.declare);
+    if (widget.globalState.isNotEmpty) {
+      StacGlobalState.instance.declareAll(widget.globalState);
+    }
+    final initial = widget.initialState.isEmpty
+        ? widget.initialState
+        : _resolveInitial(widget.initialState);
+    initial.forEach(_store.declare);
+    if (widget.onInit != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _runOnInit());
+    }
   }
+
+  /// Initial values resolved once against `params`/`global` (data, so no
+  /// "skip children" rule: `initial` is a deep data key).
+  Map<String, Object?> _resolveInitial(Map<String, Object?> initial) {
+    try {
+      final wrapper = StacBinding.resolve(
+        {'initial': initial},
+        StacScope.of(context),
+        isAction: true,
+      );
+      return Map<String, Object?>.from((wrapper as Map)['initial'] as Map);
+    } catch (e) {
+      Log.e('Failed to resolve initial state: $e');
+      return initial;
+    }
+  }
+
+  void _runOnInit() {
+    final inner = _innerContext;
+    if (!mounted || inner == null || !inner.mounted) return;
+    final onInit = widget.onInit;
+    final Map<String, dynamic> action;
+    if (onInit is Map) {
+      action = Map<String, dynamic>.from(onInit);
+    } else if (onInit is List) {
+      action = {'actionType': 'multiAction', 'sync': true, 'actions': onInit};
+    } else {
+      Log.e('onInit must be an action or a list of actions, got $onInit');
+      return;
+    }
+    StacService.onCallFromJson(action, inner);
+  }
+
+  BuildContext? _innerContext;
 
   @override
   void dispose() {
@@ -141,7 +193,13 @@ class _StacStateScopeState extends State<StacStateScope> {
   Widget build(BuildContext context) => _StacStateInherited(
     store: _store,
     requests: _requests,
-    child: widget.child,
+    // Context below the inherited widget, for onInit (T5 note).
+    child: Builder(
+      builder: (context) {
+        _innerContext = context;
+        return widget.child;
+      },
+    ),
   );
 }
 

@@ -41,12 +41,14 @@ class StacConditional extends StacWidget {
     this.ifFalse,
   });
 
-  /// The boolean expression to evaluate.
+  /// The condition to evaluate.
   ///
-  /// This string is evaluated at runtime by the framework's expression
-  /// resolver. If it evaluates to true, [ifTrue] is rendered; otherwise
+  /// Either a string evaluated at runtime by the framework's expression
+  /// resolver, a bool, or a state binding (`{"\$expr": "..."}` /
+  /// `{"\$state": "key"}`, resolved to a bool before parsing). If it is true,
+  /// [ifTrue] is rendered; otherwise (including a null or non-bool result)
   /// [ifFalse] is rendered when provided.
-  final String condition;
+  final dynamic condition;
 
   /// The widget to render when [condition] evaluates to true.
   final StacWidget ifTrue;
