@@ -154,7 +154,7 @@ class StacGlobalState { static final StacGlobalState instance; StacStateStore ge
 
 ---
 
-### Task 3: Escopos (estado de tela, variaveis locais, variaveis de action) e harness de teste
+### Task 3: Escopos (estado de tela, variaveis locais, variaveis de action) e harness de teste [CONCLUIDA]
 
 **Dificuldade:** medio. **Depende de:** T1, T2.
 
