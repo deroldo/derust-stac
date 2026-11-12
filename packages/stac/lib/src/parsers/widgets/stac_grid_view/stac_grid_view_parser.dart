@@ -8,6 +8,7 @@ import 'package:stac/src/parsers/foundation/interaction/stac_scroll_physics_pars
 import 'package:stac/src/parsers/foundation/interaction/stac_scroll_view_keyboard_dismiss_behavior_parser.dart';
 import 'package:stac/src/parsers/foundation/layout/stac_axis_parser.dart';
 import 'package:stac/src/parsers/foundation/layout/stac_clip_parser.dart';
+import 'package:stac/src/state/stac_item_template.dart';
 import 'package:stac_core/stac_core.dart';
 import 'package:stac_framework/stac_framework.dart';
 
@@ -23,6 +24,10 @@ class StacGridViewParser extends StacParser<StacGridView> {
 
   @override
   Widget parse(BuildContext context, StacGridView model) {
+    final template = model.itemTemplate;
+    final items = StacItemTemplate.isActive(template)
+        ? StacItemTemplate.itemsOf(model.items, type)
+        : null;
     return GridView.builder(
       scrollDirection: model.scrollDirection?.parse ?? Axis.vertical,
       reverse: model.reverse ?? false,
@@ -44,6 +49,15 @@ class StacGridViewParser extends StacParser<StacGridView> {
           ? null
           : ScrollCacheExtent.pixels(model.cacheExtent!),
       itemBuilder: (context, index) {
+        if (items != null) {
+          return StacItemTemplate.build(
+            template: template!,
+            item: items[index],
+            index: index,
+            as: model.as,
+            indexAs: model.indexAs,
+          );
+        }
         final children = model.children;
         if (children == null || index >= children.length) {
           return const SizedBox.shrink();
@@ -55,7 +69,7 @@ class StacGridViewParser extends StacParser<StacGridView> {
               children[index].parse(context) ?? const SizedBox.shrink(),
         );
       },
-      itemCount: model.children?.length ?? 0,
+      itemCount: items?.length ?? model.children?.length ?? 0,
       semanticChildCount: model.semanticChildCount,
       dragStartBehavior:
           model.dragStartBehavior?.parse ?? DragStartBehavior.start,

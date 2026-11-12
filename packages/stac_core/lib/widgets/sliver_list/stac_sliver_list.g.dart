@@ -11,6 +11,12 @@ StacSliverList _$StacSliverListFromJson(Map<String, dynamic> json) =>
       children: (json['children'] as List<dynamic>?)
           ?.map((e) => StacWidget.fromJson(e as Map<String, dynamic>))
           .toList(),
+      items: json['items'],
+      as: json['as'] as String?,
+      indexAs: json['indexAs'] as String?,
+      itemTemplate: json['itemTemplate'] == null
+          ? null
+          : StacWidget.fromJson(json['itemTemplate'] as Map<String, dynamic>),
       addAutomaticKeepAlives: json['addAutomaticKeepAlives'] as bool?,
       addRepaintBoundaries: json['addRepaintBoundaries'] as bool?,
       addSemanticIndexes: json['addSemanticIndexes'] as bool?,
@@ -24,5 +30,9 @@ Map<String, dynamic> _$StacSliverListToJson(StacSliverList instance) =>
       'addRepaintBoundaries': instance.addRepaintBoundaries,
       'addSemanticIndexes': instance.addSemanticIndexes,
       'semanticIndexOffset': instance.semanticIndexOffset,
+      'items': instance.items,
+      'as': instance.as,
+      'indexAs': instance.indexAs,
+      'itemTemplate': instance.itemTemplate?.toJson(),
       'type': instance.type,
     };

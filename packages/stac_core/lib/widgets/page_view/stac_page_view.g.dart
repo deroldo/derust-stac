@@ -31,6 +31,12 @@ StacPageView _$StacPageViewFromJson(Map<String, dynamic> json) => StacPageView(
   children: (json['children'] as List<dynamic>?)
       ?.map((e) => StacWidget.fromJson(e as Map<String, dynamic>))
       .toList(),
+  items: json['items'],
+  as: json['as'] as String?,
+  indexAs: json['indexAs'] as String?,
+  itemTemplate: json['itemTemplate'] == null
+      ? null
+      : StacWidget.fromJson(json['itemTemplate'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$StacPageViewToJson(
@@ -51,6 +57,10 @@ Map<String, dynamic> _$StacPageViewToJson(
   'keepPage': instance.keepPage,
   'viewportFraction': const DoubleConverter().toJson(instance.viewportFraction),
   'children': instance.children?.map((e) => e.toJson()).toList(),
+  'items': instance.items,
+  'as': instance.as,
+  'indexAs': instance.indexAs,
+  'itemTemplate': instance.itemTemplate?.toJson(),
   'type': instance.type,
 };
 

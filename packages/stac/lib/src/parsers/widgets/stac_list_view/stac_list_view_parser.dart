@@ -8,6 +8,7 @@ import 'package:stac/src/parsers/foundation/interaction/stac_scroll_physics_pars
 import 'package:stac/src/parsers/foundation/interaction/stac_scroll_view_keyboard_dismiss_behavior_parser.dart';
 import 'package:stac/src/parsers/foundation/layout/stac_axis_parser.dart';
 import 'package:stac/src/parsers/foundation/layout/stac_clip_parser.dart';
+import 'package:stac/src/state/stac_item_template.dart';
 import 'package:stac_core/stac_core.dart';
 import 'package:stac_framework/stac_framework.dart';
 
@@ -25,6 +26,10 @@ class StacListViewParser extends StacParser<StacListView> {
 
   @override
   Widget parse(BuildContext context, StacListView model) {
+    final template = model.itemTemplate;
+    final items = StacItemTemplate.isActive(template)
+        ? StacItemTemplate.itemsOf(model.items, type)
+        : null;
     return ListView.separated(
       scrollDirection: model.scrollDirection?.parse ?? Axis.vertical,
       reverse: model.reverse ?? false,
@@ -46,8 +51,17 @@ class StacListViewParser extends StacParser<StacListView> {
           ScrollViewKeyboardDismissBehavior.manual,
       restorationId: model.restorationId,
       clipBehavior: model.clipBehavior?.parse ?? Clip.hardEdge,
-      itemCount: model.children?.length ?? 0,
+      itemCount: items?.length ?? model.children?.length ?? 0,
       itemBuilder: (context, index) {
+        if (items != null) {
+          return StacItemTemplate.build(
+            template: template!,
+            item: items[index],
+            index: index,
+            as: model.as,
+            indexAs: model.indexAs,
+          );
+        }
         if (model.children == null || model.children!.isEmpty) {
           return const SizedBox();
         }

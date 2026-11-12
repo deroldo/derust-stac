@@ -30,6 +30,12 @@ StacGridView _$StacGridViewFromJson(Map<String, dynamic> json) => StacGridView(
   children: (json['children'] as List<dynamic>?)
       ?.map((e) => StacWidget.fromJson(e as Map<String, dynamic>))
       .toList(),
+  items: json['items'],
+  as: json['as'] as String?,
+  indexAs: json['indexAs'] as String?,
+  itemTemplate: json['itemTemplate'] == null
+      ? null
+      : StacWidget.fromJson(json['itemTemplate'] as Map<String, dynamic>),
   semanticChildCount: (json['semanticChildCount'] as num?)?.toInt(),
   dragStartBehavior: $enumDecodeNullable(
     _$StacDragStartBehaviorEnumMap,
@@ -70,6 +76,10 @@ Map<String, dynamic> _$StacGridViewToJson(
           .keyboardDismissBehavior],
   'restorationId': instance.restorationId,
   'clipBehavior': _$StacClipEnumMap[instance.clipBehavior],
+  'items': instance.items,
+  'as': instance.as,
+  'indexAs': instance.indexAs,
+  'itemTemplate': instance.itemTemplate?.toJson(),
   'type': instance.type,
 };
 

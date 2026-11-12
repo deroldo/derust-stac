@@ -88,6 +88,10 @@ class StacSliverGrid extends StacWidget {
     this.addRepaintBoundaries,
     this.addSemanticIndexes,
     this.children,
+    this.items,
+    this.as,
+    this.indexAs,
+    this.itemTemplate,
   });
 
   /// The number of children in the cross axis.
@@ -140,6 +144,23 @@ class StacSliverGrid extends StacWidget {
   ///
   /// Each child is rendered as a grid item.
   final List<StacWidget>? children;
+
+  /// Items to render with [itemTemplate]. Usually a binding such as
+  /// `{"$state": "todos"}`; resolved by the runtime into a list before the
+  /// widget is built. Anything that is not a list renders nothing.
+  final Object? items;
+
+  /// Name under which the current item is visible inside [itemTemplate].
+  /// Defaults to `item`.
+  final String? as;
+
+  /// Name under which the current index is visible inside [itemTemplate].
+  /// Defaults to `index`.
+  final String? indexAs;
+
+  /// Widget built lazily once per entry of [items]. When set together with
+  /// [items], it takes precedence over `children`.
+  final StacWidget? itemTemplate;
 
   /// Widget type identifier used by the Stac parser system.
   @override

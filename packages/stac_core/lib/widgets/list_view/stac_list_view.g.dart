@@ -25,6 +25,12 @@ StacListView _$StacListViewFromJson(Map<String, dynamic> json) => StacListView(
   children: (json['children'] as List<dynamic>?)
       ?.map((e) => StacWidget.fromJson(e as Map<String, dynamic>))
       .toList(),
+  items: json['items'],
+  as: json['as'] as String?,
+  indexAs: json['indexAs'] as String?,
+  itemTemplate: json['itemTemplate'] == null
+      ? null
+      : StacWidget.fromJson(json['itemTemplate'] as Map<String, dynamic>),
   separator: json['separator'] == null
       ? null
       : StacWidget.fromJson(json['separator'] as Map<String, dynamic>),
@@ -63,6 +69,10 @@ Map<String, dynamic> _$StacListViewToJson(StacListView instance) =>
               .keyboardDismissBehavior],
       'restorationId': instance.restorationId,
       'clipBehavior': _$StacClipEnumMap[instance.clipBehavior],
+      'items': instance.items,
+      'as': instance.as,
+      'indexAs': instance.indexAs,
+      'itemTemplate': instance.itemTemplate?.toJson(),
       'type': instance.type,
     };
 

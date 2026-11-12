@@ -66,6 +66,10 @@ class StacGridView extends StacWidget {
     this.addSemanticIndexes,
     this.cacheExtent,
     this.children,
+    this.items,
+    this.as,
+    this.indexAs,
+    this.itemTemplate,
     this.semanticChildCount,
     this.dragStartBehavior,
     this.keyboardDismissBehavior,
@@ -155,6 +159,23 @@ class StacGridView extends StacWidget {
   /// The clip behavior of the grid.
   /// Defaults to [StacClip.hardEdge].
   final StacClip? clipBehavior;
+
+  /// Items to render with [itemTemplate]. Usually a binding such as
+  /// `{"$state": "todos"}`; resolved by the runtime into a list before the
+  /// widget is built. Anything that is not a list renders nothing.
+  final Object? items;
+
+  /// Name under which the current item is visible inside [itemTemplate].
+  /// Defaults to `item`.
+  final String? as;
+
+  /// Name under which the current index is visible inside [itemTemplate].
+  /// Defaults to `index`.
+  final String? indexAs;
+
+  /// Widget built lazily once per entry of [items]. When set together with
+  /// [items], it takes precedence over `children`.
+  final StacWidget? itemTemplate;
 
   /// Widget type identifier.
   @override

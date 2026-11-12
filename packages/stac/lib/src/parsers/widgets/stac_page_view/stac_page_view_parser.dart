@@ -6,6 +6,7 @@ import 'package:stac/src/parsers/foundation/interaction/stac_drag_start_behavior
 import 'package:stac/src/parsers/foundation/interaction/stac_scroll_physics_parser.dart';
 import 'package:stac/src/parsers/foundation/layout/stac_axis_parser.dart';
 import 'package:stac/src/parsers/foundation/layout/stac_clip_parser.dart';
+import 'package:stac/src/state/stac_item_template.dart';
 import 'package:stac_core/stac_core.dart';
 import 'package:stac_framework/stac_framework.dart';
 
@@ -50,6 +51,10 @@ class _StacPageViewWidgetState extends State<_StacPageViewWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final template = widget.model.itemTemplate;
+    final items = StacItemTemplate.isActive(template)
+        ? StacItemTemplate.itemsOf(widget.model.items, widget.model.type)
+        : null;
     return PageView.builder(
       scrollDirection: widget.model.scrollDirection?.parse ?? Axis.horizontal,
       reverse: widget.model.reverse ?? false,
@@ -61,11 +66,23 @@ class _StacPageViewWidgetState extends State<_StacPageViewWidget> {
       },
       // Parse in the page's own element, so theme colors and text styles
       // resolved while parsing update when the theme changes.
-      itemBuilder: (context, index) => Builder(
-        builder: (context) =>
-            widget.model.children?[index].parse(context) ?? const SizedBox(),
-      ),
-      itemCount: widget.model.children?.length,
+      itemBuilder: (context, index) {
+        if (items != null) {
+          return StacItemTemplate.build(
+            template: template!,
+            item: items[index],
+            index: index,
+            as: widget.model.as,
+            indexAs: widget.model.indexAs,
+            fallback: const SizedBox(),
+          );
+        }
+        return Builder(
+          builder: (context) =>
+              widget.model.children?[index].parse(context) ?? const SizedBox(),
+        );
+      },
+      itemCount: items?.length ?? widget.model.children?.length,
       dragStartBehavior:
           widget.model.dragStartBehavior?.parse ?? DragStartBehavior.start,
       allowImplicitScrolling: widget.model.allowImplicitScrolling ?? false,
