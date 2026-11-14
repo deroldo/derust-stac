@@ -66,6 +66,24 @@ Path to a local asset file (e.g. in `assets/`) that contains the Stac widget JSO
 
 **Used with:** any push-style `navigationStyle`. For Flutter routes use `pushNamed`, `pushReplacementNamed`, or `pushNamedAndRemoveAll`; for Stac screens use `push`, `pushReplacement`, or `pushAndRemoveAll`.
 
+#### `routeName` together with `request`, `widgetJson` or `assetPath`
+
+With `push`, `pushReplacement` or `pushAndRemoveAll`, a `routeName` next to a `request` (or `widgetJson` / `assetPath`) does not choose the screen: the screen still comes from the `request` URL. The `routeName` becomes the **name of the pushed route** (`RouteSettings.name`). That name is what Flutter reports to the browser, so on web it is the page URL, and `ModalRoute.of(context)?.settings.name` returns it.
+
+```json
+{
+  "actionType": "navigate",
+  "request": { "actionType": "networkRequest", "url": "https://api.example.com/v1/screens/profile", "method": "get" },
+  "routeName": "/screens/profile?choose=true"
+}
+```
+
+- **Without `routeName`** nothing changes: the route is unnamed and the browser URL is not touched.
+- The name may carry a query string (`?choose=true`). Put in it only what the screen needs to be rebuilt after a reload (ids, flags). Never put tokens or other secrets: it is visible in the address bar and the browser history.
+- `params` and `arguments` are **not** part of the URL. They live in memory and are gone after a reload.
+- With `pushAndRemoveAll`, a `routeName` removes **every** route below the new one, so the stack, and the URL, is just the new screen. Without `routeName` the established behavior is kept: the route named `/` stays.
+- Rebuilding the screen from the URL (reload, shared link) is up to the app: see [Web URLs](#web-urls).
+
 ---
 
 ### navigationStyle
@@ -121,7 +139,23 @@ The runtime tells "a result was given" apart from "no result" by whether the `re
 Values handed to the destination screen. They are resolved when the action runs and copied (a snapshot): changing the state of the origin screen afterwards does not change what the destination sees. In the destination, every [binding](/concepts/bindings_and_expressions) can read them as `params.<name>`, including the initial values of its `state`.
 
 - Works with `request`, `widgetJson`, `assetPath` and `routeName` on `push`, `pushReplacement` and `pushAndRemoveAll`.
-- With the Flutter named-route styles (`pushNamed`, `pushReplacementNamed`, `pushNamedAndRemoveAll`) Stac does not build the screen, so it cannot provide `params` as a variable. They are delivered inside `arguments` under the key `__stacParams`, and your app's route builder is responsible for reading them (and, for example, wrapping the screen it builds). Treat `params` with named routes as a limitation: prefer `routeName` with `push` for Stac screens.
+- With the Flutter named-route styles (`pushNamed`, `pushReplacementNamed`, `pushNamedAndRemoveAll`) Stac does not build the screen, so it cannot provide `params` as a variable. They are delivered inside `arguments` under the key `__stacParams`, and your app's route builder wraps the screen it builds in a `StacLocalScope`, after which the screen reads `params.<name>` as usual (tested, including a `showSnackBar` that shows `params.message` when the screen opens):
+
+  ```dart
+  onGenerateRoute: (settings) {
+    final args = settings.arguments;
+    final params = args is Map ? args['__stacParams'] : null;
+    return MaterialPageRoute(
+      settings: settings,
+      builder: (_) => StacLocalScope(
+        vars: {'params': ?params},
+        child: Builder(builder: (context) => buildStacScreen(context, settings)),
+      ),
+    );
+  }
+  ```
+
+  After a reload or when the link is opened directly there are no `params`: `params.<name>` reads `null`, so guard anything that depends on it (for example `"condition": { "$expr": "length(params.message) > 0" }`).
 - `params` is a local variable, not a state key. To keep a value, copy it into state with `setState` from the destination's `onInit`.
 
 ---
@@ -234,3 +268,16 @@ Notes on this flow:
 - `Navigator.push` itself still returns a future to code that awaits it, and that value is the plain result (`null` on cancel).
 
 For examples (Dart and JSON), see [Navigation in Stac](/concepts/navigation_in_stac#examples).
+
+---
+
+## Web URLs
+
+On Flutter web the `Navigator` reports the name of the top route to the browser. So that the URL follows the screen, that a reload or a shared link reopens it, and that the browser back button pops the stack:
+
+1. Give every navigable screen a `routeName` (see above), or use the named styles.
+2. In the app, call `usePathUrlStrategy()` (from `flutter_web_plugins`) before `runApp` for paths without `#`, and make the host return `index.html` for unknown paths.
+3. In the app, map the route name back to the screen with `onGenerateRoute`. A single generic rule is enough, for example `/screens/<name>?query` to `<base>/v1/screens/<name>?query`, building the screen with `Stac.fromNetwork`.
+4. Return only the requested route from `onGenerateInitialRoutes`. By default Flutter pushes every prefix of the path (`/`, `/screens`, `/screens/profile`) and each one must resolve.
+
+Limits: this is the classic `Navigator` model. The browser keeps a single history entry that is replaced as the screen changes, the back button pops the Stac stack, and the forward button is not supported. Full browser history needs the Router API and is out of scope.

@@ -89,6 +89,12 @@ class StacNavigateAction extends StacAction {
   final String? assetPath;
 
   /// Named route to push/pop.
+  ///
+  /// With `push`, `pushReplacement` and `pushAndRemoveAll` next to a
+  /// [request], [widgetJson] or [assetPath], it does not pick the screen: it
+  /// names the pushed route (the browser URL on web, e.g.
+  /// `/screens/profile?choose=true`). Without it the route is unnamed. With
+  /// `pushAndRemoveAll` it also removes every route below the new one.
   final String? routeName;
 
   /// How navigation should be performed.

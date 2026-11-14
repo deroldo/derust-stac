@@ -120,8 +120,13 @@ class StacNavigateActionParser extends StacActionParser<StacNavigateAction> {
     Object? result,
     Map<String, dynamic>? arguments,
   }) {
-    Route<dynamic> route() =>
-        MaterialPageRoute(builder: builder ?? (_) => const SizedBox());
+    // A route that carries a `routeName` is named, so Flutter reports it to the
+    // browser (web URL) and `ModalRoute.of(context).settings.name` returns it.
+    // Without a `routeName` the route stays unnamed, as before.
+    Route<dynamic> route() => MaterialPageRoute(
+      settings: routeName == null ? null : RouteSettings(name: routeName),
+      builder: builder ?? (_) => const SizedBox(),
+    );
 
     switch (navigationStyle) {
       case NavigationStyle.push:
@@ -138,7 +143,10 @@ class StacNavigateActionParser extends StacActionParser<StacNavigateAction> {
         return Navigator.pushAndRemoveUntil(
           context,
           route(),
-          ModalRoute.withName('/'),
+          // With a `routeName` every route below is removed, so the stack (and
+          // the browser URL) is exactly the new screen. Without one the
+          // established behavior is kept: the route named '/' stays.
+          routeName == null ? ModalRoute.withName('/') : (_) => false,
         );
 
       case NavigationStyle.popAll:

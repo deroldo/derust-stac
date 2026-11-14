@@ -19,6 +19,10 @@ This page documents the version history of Stac, including new features, breakin
 - `listView`, `gridView`, `pageView`, `sliverList` and `sliverGrid` render `items` with an `itemTemplate`
 - `conditional.condition` accepts a binding or a `bool`
 - Added the [State Reference](/concepts/state_reference) page with the complete JSON contract
+- `navigate` with a `request`, `widgetJson` or `assetPath` now uses `routeName` as the name of the pushed route (`RouteSettings.name`), so the browser URL follows the screen on web. Without `routeName` nothing changes. With `pushAndRemoveAll`, a `routeName` removes every route below the new one. See [Web URLs](/actions/navigate#web-urls)
+- `showSnackBar` content now resolves bindings (`params`, screen `state`); it used to render them empty because the SnackBar is built outside the screen
+- A request carried by `navigate`, `showDialog`, `showModalBottomSheet`, `networkWidget` or `dynamicView` now resolves the bindings in its `headers`, `body` and `queryParameters`
+- Material and Cupertino imports moved to `package:material_ui` and `package:cupertino_ui`. Apps must use the `material_ui` `MaterialApp` with Stac; `flutter/material.dart` and `material_ui` cannot be mixed
 
 ---
 

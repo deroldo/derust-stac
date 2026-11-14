@@ -10,6 +10,7 @@ import 'package:stac/src/parsers/foundation/interaction/stac_hit_test_behavior_p
 import 'package:stac/src/parsers/foundation/layout/stac_clip_parser.dart';
 import 'package:stac/src/parsers/foundation/ui_components/stac_dismiss_direction_parser.dart';
 import 'package:stac/src/parsers/foundation/ui_components/stac_snack_bar_behavior_parser.dart';
+import 'package:stac/src/state/stac_scope.dart';
 import 'package:stac/src/utils/color_utils.dart';
 import 'package:stac_core/stac_core.dart';
 import 'package:stac_framework/stac_framework.dart';
@@ -29,9 +30,18 @@ class StacSnackBarParser extends StacActionParser<StacSnackBar> {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     scaffoldMessenger.hideCurrentSnackBar();
 
+    // The SnackBar is built by the ScaffoldMessenger, outside the screen: hand
+    // it the screen's state and local variables (such as `params`) so the
+    // bindings in its content resolve, as showDialog does.
+    final reprovide = StacStateScope.reprovider(context);
     scaffoldMessenger.showSnackBar(
       SnackBar(
-        content: Stac.fromJson(model.content, context) ?? SizedBox.shrink(),
+        content: reprovide(
+          Builder(
+            builder: (c) =>
+                Stac.fromJson(model.content, c) ?? SizedBox.shrink(),
+          ),
+        ),
         backgroundColor: model.backgroundColor?.toColor(context),
         elevation: model.elevation,
         margin: model.margin?.parse,
