@@ -75,6 +75,11 @@ class _TextFormFieldWidgetState extends State<_TextFormFieldWidget> {
   @override
   void didUpdateWidget(_TextFormFieldWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // obscureText can be reactive (e.g. a "show password" toggle): follow it
+    // when the model changes, otherwise the field keeps its first value.
+    if (oldWidget.model.obscureText != widget.model.obscureText) {
+      _obscureText = widget.model.obscureText ?? false;
+    }
     // Only an incoming value change is written, and only when it differs from
     // what the field shows: typing writes the store, which comes back here
     // with the same text, so focus and caret stay untouched.
