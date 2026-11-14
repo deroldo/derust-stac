@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:stac/src/framework/framework.dart';
 import 'package:stac/src/parsers/actions/stac_state_mutation/stac_state_mutation_utils.dart';
 import 'package:stac/src/services/stac_network_service.dart';

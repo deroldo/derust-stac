@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:stac/src/framework/framework.dart';
 import 'package:stac/src/state/stac_action_vars.dart';
 import 'package:stac/src/state/stac_pop_result.dart';

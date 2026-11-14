@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:stac/src/parsers/core/stac_widget_parser.dart';
 import 'package:stac/src/parsers/foundation/interaction/stac_drag_start_behavior_parser.dart';
 import 'package:stac/src/parsers/foundation/interaction/stac_hit_test_behavior_parser.dart';

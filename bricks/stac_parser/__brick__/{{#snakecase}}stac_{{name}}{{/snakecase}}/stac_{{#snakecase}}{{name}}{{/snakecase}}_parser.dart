@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:stac/stac.dart';
 
 class Stac{{#pascalCase}}{{name}}{{/pascalCase}}Parser extends StacParser<Stac{{#pascalCase}}{{name}}{{/pascalCase}}> {

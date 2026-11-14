@@ -1,5 +1,5 @@
 import 'package:stac/src/state/stac_action_vars.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:stac/src/framework/stac.dart';
 import 'package:stac/src/parsers/foundation/interaction/stac_mouse_cursor_parser.dart';
 import 'package:stac/src/parsers/foundation/layout/stac_material_tap_target_size_parser.dart';
