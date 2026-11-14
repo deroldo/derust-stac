@@ -173,7 +173,7 @@ Each entry is the initial value itself, or a declaration object when it contains
 - Value on declaration: memory (already set this session), else the persisted copy (if valid and of the same JSON type as `initial`; `null` accepts any type), else `initial`.
 - `persist` / `secure` on a screen key is ignored with a warning.
 - Values must be JSON to be saved. Storage errors are logged and never break the screen.
-- Secure values are replaced by `***` (by text substitution) in diagnostics, are left out of `bodyFromState`, and on web are not saved. See [State](/concepts/state#secure-values).
+- Secure values are replaced by `***` (by text substitution) in diagnostics, are left out of `bodyFromState`, and on web are saved only if the app passes `secureStatePersistence` to `Stac.initialize` (for example `SecurePersistence()`, exported by `package:stac/stac.dart`; it needs HTTPS or `localhost`). Even then the web storage is encrypted `localStorage`, which does not protect against XSS. See [State](/concepts/state#secure-values) and [Secure values on web](/concepts/state#secure-values-on-web).
 
 ```json
 {

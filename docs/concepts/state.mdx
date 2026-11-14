@@ -193,7 +193,23 @@ A `secure` key is meant for tokens and similar data:
 - In the diagnostics where Stac may print state values (binding warnings, request errors, the debug error widget with the widget JSON), every text that equals a secure value is replaced by `***`. The match is by text, so a very short secret (such as `1`) also hides that text elsewhere in the output. Your own UI is not affected: a `text` bound to the key shows the real value.
 - `bodyFromState` leaves secure keys out of the request body and logs a warning. Secure values are never added to `params` automatically.
 - You can still use a secure key explicitly, for example in a header: `"Authorization": { "$expr": "'Bearer ' + global.token" }`.
-- On web there is no secure storage. The key behaves as a normal in-memory key (it is not saved) and a warning is logged once.
+- On web a `secure` key is **not saved by default**: it behaves as a normal in-memory key and a warning is logged once. To keep it across reloads, pass `SecurePersistence()` as `secureStatePersistence`. See [Secure values on web](#secure-values-on-web).
+
+#### Secure values on web
+
+On web, `secure` keys are saved only if the app passes `secureStatePersistence` to `Stac.initialize`. A value you pass always wins over the web default (the no-op), so this is all it takes:
+
+```dart
+await Stac.initialize(
+  secureStatePersistence: const SecurePersistence(),
+);
+```
+
+`SecurePersistence` and `StacStatePersistence` are exported by `package:stac/stac.dart`. `SecurePersistence` uses `flutter_secure_storage`, whose web version encrypts each value with AES-GCM (WebCrypto) and stores it in `localStorage` under the `FlutterSecureStorage.stac_state.<key>` entries. Checked in Chrome: a value written in one session is read back by a fresh storage instance, and the stored text does not contain the plain value.
+
+- **Secure context required.** WebCrypto only exists on HTTPS or on `localhost`. On plain `http://` from another host the storage throws `UnsupportedError`; Stac logs "Failed to write persisted global key" and the key stays in memory only (the value is lost on reload).
+- **Persists across reloads** and browser restarts. It is per origin (scheme, host and port), so a different host or port starts empty. Clearing site data removes it.
+- **Not a defence against XSS.** Without extra options the AES key is kept in `localStorage` too, next to the encrypted values, so any script running on your page can read both. The encryption only hides the value from someone casually reading `localStorage`, for example in the devtools or a disk dump. You can pass your own `FlutterSecureStorage(webOptions: WebOptions(wrapKey: ..., wrapKeyIv: ...))` to `SecurePersistence`, but that key has to be available to your page's JavaScript as well, so the gain is small. For high-value tokens, prefer an `HttpOnly` cookie set by your server.
 
 ### Storage and tests
 
