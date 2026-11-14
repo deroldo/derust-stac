@@ -599,7 +599,10 @@ class StacService {
     ErrorWidgetBuilder? errorWidget,
   }) {
     return FutureBuilder<Response?>(
-      future: StacNetworkService.request(context, request),
+      future: StacNetworkService.request(
+        context,
+        StacNetworkService.resolveBindings(context, request),
+      ),
       builder: (context, snapshot) {
         switch (snapshot.connectionState) {
           case ConnectionState.waiting:

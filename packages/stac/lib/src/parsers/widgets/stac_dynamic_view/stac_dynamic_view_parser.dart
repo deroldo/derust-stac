@@ -94,7 +94,10 @@ class StacDynamicViewParser extends StacParser<StacDynamicView> {
     StacDynamicView model,
   ) async {
     try {
-      return await StacNetworkService.request(context, model.request);
+      return await StacNetworkService.request(
+        context,
+        StacNetworkService.resolveBindings(context, model.request),
+      );
     } catch (e) {
       Log.e('Error fetching dynamic content: $e');
       rethrow;
