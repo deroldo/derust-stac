@@ -1,6 +1,9 @@
 export 'package:stac/src/framework/framework.dart';
 export 'package:stac/src/models/models.dart';
 export 'package:stac/src/parsers/actions/actions.dart';
+export 'package:stac/src/recovery/stac_envelope_recognizer.dart';
+export 'package:stac/src/recovery/stac_error_envelope.dart';
+export 'package:stac/src/recovery/stac_recovery_instruction.dart';
 export 'package:stac/src/parsers/parsers.dart';
 export 'package:stac/src/services/services.dart';
 export 'package:stac/src/state/stac_state_exports.dart';

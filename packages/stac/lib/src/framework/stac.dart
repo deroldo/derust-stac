@@ -132,6 +132,11 @@ class Stac extends StatelessWidget {
   /// If `null`, an empty [SizedBox] is shown on error.
   final Widget? errorWidget;
 
+  /// Builder for the generic error shown when a request fails without a
+  /// server-provided screen. Set via [initialize]; consumed by the runtime.
+  static Widget Function(BuildContext context, Object error)?
+  genericErrorBuilder;
+
   /// Initializes Stac with the provided configuration.
   ///
   /// This must be called before using any Stac widgets, typically in
@@ -198,7 +203,9 @@ class Stac extends StatelessWidget {
     StacCacheConfig? cacheConfig,
     StacStatePersistence? statePersistence,
     StacStatePersistence? secureStatePersistence,
+    Widget Function(BuildContext context, Object error)? genericErrorBuilder,
   }) async {
+    Stac.genericErrorBuilder = genericErrorBuilder;
     return StacService.initialize(
       options: options,
       parsers: parsers,
