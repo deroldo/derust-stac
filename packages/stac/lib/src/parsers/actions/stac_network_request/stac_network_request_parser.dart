@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:stac/src/framework/framework.dart';
-import 'package:stac/src/parsers/actions/stac_state_mutation/stac_state_mutation_utils.dart';
+import 'package:stac/src/recovery/stac_request_template.dart';
 import 'package:stac/src/services/stac_network_service.dart';
 import 'package:stac/src/state/stac_action_vars.dart';
 import 'package:stac/src/state/stac_global_state.dart';
@@ -32,6 +32,7 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     // The chain also captures the scopes of the trigger widget: it outlives
     // that widget when a callback removes it (optimistic delete), closes its
     // dialog or replaces its screen, and the callbacks must still run.
+    final unresolved = takeStacUnresolvedRequest();
     final captured = StacCapturedScope.capture(context);
     final registry = captured.requests;
     final key = model.requestKey;
@@ -39,7 +40,13 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     try {
       return await runWithStacCapturedScope<dynamic>(
         captured,
-        () => _run(context, _withStateBody(context, model), token, captured),
+        () => _run(
+          context,
+          _withStateBody(context, model),
+          token,
+          captured,
+          unresolved,
+        ),
       );
     } finally {
       registry.finish(key, token);
@@ -51,6 +58,7 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     StacNetworkRequest model,
     CancelToken token,
     StacCapturedScope captured,
+    Map<String, dynamic>? unresolved,
   ) async {
     // A request is discarded (no callback runs) once it was superseded or
     // cancelled, which includes its screen closing (the screen cancels all of
@@ -72,6 +80,15 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
         context,
         model,
         cancelToken: token,
+        template: StacRequestTemplate(
+          json: Map<String, dynamic>.of(unresolved ?? model.toJson())
+            ..remove('condition'),
+          scope: captured,
+          alive: alive,
+          requestKey: model.requestKey,
+          cancelToken: token,
+          stateBody: true,
+        ),
       );
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) return null;
@@ -221,44 +238,7 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
   StacNetworkRequest _withStateBody(
     BuildContext context,
     StacNetworkRequest model,
-  ) {
-    final keys = model.bodyFromState;
-    if (keys == null || keys.isEmpty) return model;
-    if (model.body != null) {
-      Log.w(
-        StacGlobalState.instance.redact(
-          'networkRequest ${model.url}: both body and bodyFromState set; '
-          'the explicit body wins',
-        ),
-      );
-      return model;
-    }
-    final scope = StacScope.of(context);
-    final body = <String, Object?>{};
-    for (final key in keys) {
-      final store = scope.storeFor(key);
-      if (store != null && store.isSecure(stacStateLocalKey(key))) {
-        Log.w('bodyFromState: "$key" is secure and was left out');
-        continue;
-      }
-      body[key] = stacStateRead(scope, key);
-    }
-    return StacNetworkRequest(
-      url: model.url,
-      method: model.method,
-      queryParameters: model.queryParameters,
-      headers: model.headers,
-      contentType: model.contentType,
-      body: body,
-      results: model.results,
-      onStart: model.onStart,
-      onSuccess: model.onSuccess,
-      onError: model.onError,
-      onFinally: model.onFinally,
-      requestKey: model.requestKey,
-      bodyFromState: model.bodyFromState,
-    );
-  }
+  ) => stacRequestWithStateBody(() => StacScope.of(context), model);
 
   /// Matches `{{response}}` and `{{response.<path>}}`, where the path uses dot
   /// notation and list indexes, e.g. `{{response.items[0].id}}`.

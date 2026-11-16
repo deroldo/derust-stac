@@ -7,7 +7,9 @@ import 'package:material_ui/material_ui.dart' hide ErrorWidgetBuilder;
 import 'package:flutter/services.dart';
 import 'package:stac/src/framework/stac.dart';
 import 'package:stac/src/framework/stac_error.dart';
+import 'package:stac/src/framework/stac_network_view.dart';
 import 'package:stac/src/framework/stac_registry.dart';
+import 'package:stac/src/recovery/stac_request_template.dart';
 import 'package:stac/src/models/stac_cache_config.dart';
 import 'package:stac/src/parsers/actions/stac_form_validate/stac_form_validate_parser.dart';
 import 'package:stac/src/parsers/actions/stac_get_form_value/stac_get_form_value_parser.dart';
@@ -546,6 +548,14 @@ class StacService {
       }
 
       final model = stacActionParser.getModel(resolvedJson);
+      if (actionType == ActionType.networkRequest.name) {
+        // The request keeps its unresolved JSON (a template to send it again
+        // with bindings re-evaluated); see StacRequestTemplate.
+        return runWithStacUnresolvedRequest(
+          json,
+          () => stacActionParser.onCall(context, model),
+        );
+      }
       return stacActionParser.onCall(context, model);
     } catch (e, stackTrace) {
       _logError(
@@ -598,11 +608,8 @@ class StacService {
     LoadingWidgetBuilder? loadingWidget,
     ErrorWidgetBuilder? errorWidget,
   }) {
-    return FutureBuilder<Response?>(
-      future: StacNetworkService.request(
-        context,
-        StacNetworkService.resolveBindings(context, request),
-      ),
+    return StacNetworkView(
+      load: StacNetworkLoad.start(context, request),
       builder: (context, snapshot) {
         switch (snapshot.connectionState) {
           case ConnectionState.waiting:

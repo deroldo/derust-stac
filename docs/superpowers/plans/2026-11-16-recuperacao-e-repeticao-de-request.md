@@ -68,7 +68,7 @@ Contexto de codigo (ler antes de qualquer tarefa): `packages/stac/lib/src/servic
 
 ---
 
-## Task 1 — Envelope, instrucao e reconhecimento (MEDIO)
+## Task 1 — Envelope, instrucao e reconhecimento (MEDIO) — CONCLUIDA
 
 **Depende de:** nada. **Atende:** Plano 4.1, 5.1, 5.2, 6 (item 4).
 
@@ -79,29 +79,29 @@ Contexto de codigo (ler antes de qualquer tarefa): `packages/stac/lib/src/servic
 **Reconhecedor puro** `StacEnvelopeRecognizer.recognize(Response)` -> `StacErrorEnvelope?`: nao-2xx, content-type (ignorar parametros `; charset`), corpo ja decodificado como `Map` (ou String JSON), `version` int == 1. Versao desconhecida/JSON invalido/campo mal formado = null + log.
 
 **Passos:**
-- [ ] Testes de tabela do reconhecedor: marcador ok; sem marcador; content-type com charset; versao 2; versao string; JSON invalido; corpo lista; envelope em 200; corpo RFC 7807 (`type`) sem marcador; `key` ausente vs `null`.
-- [ ] Implementar modelos + reconhecedor.
-- [ ] Adicionar `genericErrorBuilder` a `Stac.initialize` (apenas guardar; uso na T5).
-- [ ] analyze/format/test.
+- [x] Testes de tabela do reconhecedor: marcador ok; sem marcador; content-type com charset; versao 2; versao string; JSON invalido; corpo lista; envelope em 200; corpo RFC 7807 (`type`) sem marcador; `key` ausente vs `null`.
+- [x] Implementar modelos + reconhecedor.
+- [x] Adicionar `genericErrorBuilder` a `Stac.initialize` (apenas guardar; uso na T5).
+- [x] analyze/format/test.
 
 **Revisao:** nada no reconhecedor pode olhar status, URL ou corpo de terceiros; nunca lanca.
 
 ---
 
-## Task 2 — Molde do request, vida do request e repeticao (COMPLEXO)
+## Task 2 — Molde do request, vida do request e repeticao (COMPLEXO) — CONCLUIDA
 
 **Depende de:** T0. **Atende:** Plano 5.3, achados 2 e 3, G3, R2 (alto risco de regressao).
 
 **Contexto:** bindings sao resolvidos antes de chegar ao Dio (`_resolveActionJson`, `resolveBindings`). Para reavaliar na repeticao e preciso carregar o JSON do request ainda com bindings + escopo capturado (`StacCapturedScope`, em `state/stac_scope.dart`).
 
 **Passos:**
-- [ ] Definir `StacRequestTemplate` (M1) e `StacRequestAlive` (`bool Function()`; combina `CancelToken.isCancelled` + tela viva).
-- [ ] `_resolveActionJson` / `StacNetworkRequestParser` passam o JSON nao resolvido junto do resolvido; `StacNetworkService.request` recebe `template` opcional e o coloca em `RequestOptions.extra['stac.template']`. `fromNetwork`/`navigate.request`/dialog/sheet resolvem em `resolveBindings`: ajustar localmente para tambem entregar o molde.
-- [ ] `StacNetworkService.retryRequest(template | RequestOptions, overrides, removeHeaders)`: reavalia bindings no escopo capturado; aplica `overrides` (merge por chave, `null` remove; valores aceitam bindings, resolvidos apos a recuperacao no mesmo escopo); `removeHeaders`; reenvia com mesmo `CancelToken`, `requestKey`, `contentType`; marca `extra['stac.recovery.exempt']=true`. Nunca reexecuta `onStart`; `onSuccess`/`onError`/`onFinally` do chamador rodam com a resposta final.
-- [ ] M8: `Stac.fromNetwork` passa a `StacNetworkView` (StatefulWidget) cancelando o `CancelToken` no `dispose`; expor `alive()`.
-- [ ] Corpo nao reutilizavel (M9): detectar (`Stream`, `FormData` ja consumido) e marcar `extra['stac.retry.unsafe']`.
-- [ ] Testes: retry reavalia header `{"$state":"global.x"}` com valor novo; override merge/remove; URL/metodo inalterados; sem molde (RequestOptions) repete original; `alive()` falso depois de `dispose` da tela; `onStart` nao reexecuta.
-- [ ] Rodar toda a suite de `packages/stac` (regressao: network request, navigate.request, dialog, sheet, networkWidget) + analyze/format.
+- [x] Definir `StacRequestTemplate` (M1) e `StacRequestAlive` (`bool Function()`; combina `CancelToken.isCancelled` + tela viva).
+- [x] `_resolveActionJson` / `StacNetworkRequestParser` passam o JSON nao resolvido junto do resolvido; `StacNetworkService.request` recebe `template` opcional e o coloca em `RequestOptions.extra['stac.template']`. `fromNetwork`/`navigate.request`/dialog/sheet resolvem em `resolveBindings`: ajustar localmente para tambem entregar o molde.
+- [x] `StacNetworkService.retryRequest(template | RequestOptions, overrides, removeHeaders)`: reavalia bindings no escopo capturado; aplica `overrides` (merge por chave, `null` remove; valores aceitam bindings, resolvidos apos a recuperacao no mesmo escopo); `removeHeaders`; reenvia com mesmo `CancelToken`, `requestKey`, `contentType`; marca `extra['stac.recovery.exempt']=true`. Nunca reexecuta `onStart`; `onSuccess`/`onError`/`onFinally` do chamador rodam com a resposta final.
+- [x] M8: `Stac.fromNetwork` passa a `StacNetworkView` (StatefulWidget) cancelando o `CancelToken` no `dispose`; expor `alive()`.
+- [x] Corpo nao reutilizavel (M9): detectar (`Stream`, `FormData` ja consumido) e marcar `extra['stac.retry.unsafe']`.
+- [x] Testes: retry reavalia header `{"$state":"global.x"}` com valor novo; override merge/remove; URL/metodo inalterados; sem molde (RequestOptions) repete original; `alive()` falso depois de `dispose` da tela; `onStart` nao reexecuta.
+- [x] Rodar toda a suite de `packages/stac` (regressao: network request, navigate.request, dialog, sheet, networkWidget) + analyze/format.
 
 **Revisao:** o ponto mais delicado do runtime; revisor confere que o caminho sem molde/sem envelope e byte a byte o atual.
 
