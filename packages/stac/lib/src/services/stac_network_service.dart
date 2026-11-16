@@ -46,12 +46,6 @@ class StacNetworkService {
     StacNetworkRequest request, {
     CancelToken? cancelToken,
   }) async {
-    Map<String, dynamic> headers = Map<String, dynamic>.from(
-      request.headers ?? {},
-    );
-    _dio.options.headers = headers;
-    _dio.options.contentType = request.contentType;
-
     switch (request.method) {
       case Method.get:
         return getRequest(request, cancelToken: cancelToken);
@@ -68,6 +62,14 @@ class StacNetworkService {
     }
   }
 
+  /// Headers and content type travel with each call. Writing them to the
+  /// shared `_dio.options` would let a concurrent request overwrite them
+  /// while this one awaits (e.g. the async POST body).
+  static Options _optionsFor(StacNetworkRequest request) => Options(
+    headers: Map<String, dynamic>.from(request.headers ?? {}),
+    contentType: request.contentType,
+  );
+
   static Future<Response?> getRequest(
     StacNetworkRequest request, {
     CancelToken? cancelToken,
@@ -76,6 +78,7 @@ class StacNetworkService {
       request.url,
       data: request.body,
       queryParameters: request.queryParameters,
+      options: _optionsFor(request),
       cancelToken: cancelToken,
     );
   }
@@ -91,6 +94,7 @@ class StacNetworkService {
       request.url,
       data: body,
       queryParameters: request.queryParameters,
+      options: _optionsFor(request),
       cancelToken: cancelToken,
     );
   }
@@ -103,6 +107,7 @@ class StacNetworkService {
       request.url,
       data: request.body,
       queryParameters: request.queryParameters,
+      options: _optionsFor(request),
       cancelToken: cancelToken,
     );
   }
@@ -115,6 +120,7 @@ class StacNetworkService {
       request.url,
       data: request.body,
       queryParameters: request.queryParameters,
+      options: _optionsFor(request),
       cancelToken: cancelToken,
     );
   }

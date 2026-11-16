@@ -53,16 +53,16 @@ Contexto de codigo (ler antes de qualquer tarefa): `packages/stac/lib/src/servic
 
 ---
 
-## Task 0 — Corrida de headers no StacNetworkService (SIMPLES)
+## Task 0 — Corrida de headers no StacNetworkService (SIMPLES) — CONCLUIDA
 
 **Depende de:** nada. **Atende:** pre-requisito de qualquer repeticao confiavel (Plano 2 achado 1, 5.5).
 
 **Contexto:** `StacNetworkService.request` faz `_dio.options.headers = headers` (estado global do Dio) e, no POST, `await _updateBody(...)` antes de `_dio.post`; outro request pode sobrescrever headers/`contentType` no intervalo.
 
 **Passos:**
-- [ ] Escrever teste com `HttpClientAdapter` fake: dois requests simultaneos com headers/contentType diferentes, com `await` no meio (body assincrono no primeiro); cada request deve chegar ao adapter com os proprios headers. Deve falhar antes do conserto.
-- [ ] Trocar a mutacao de `_dio.options` por `Options(headers: ..., contentType: ...)` passado em cada chamada `get/post/put/delete/patch`. Nao alterar `_dio.options` por chamada.
-- [ ] Rodar `cd packages/stac && flutter test`, `melos run analyze`, `melos run format`.
+- [x] Escrever teste com `HttpClientAdapter` fake: dois requests simultaneos com headers/contentType diferentes, com `await` no meio (body assincrono no primeiro); cada request deve chegar ao adapter com os proprios headers. Deve falhar antes do conserto.
+- [x] Trocar a mutacao de `_dio.options` por `Options(headers: ..., contentType: ...)` passado em cada chamada `get/post/put/delete/patch`. Nao alterar `_dio.options` por chamada.
+- [x] Rodar `cd packages/stac && flutter test`, `melos run analyze`, `melos run format`.
 
 **Testes e revisao:** teste concorrente acima; regressao: requests existentes mantem headers padrao do Dio do app. Revisor confere que nenhum outro ponto muta `_dio.options.*` por request.
 
