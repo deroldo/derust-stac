@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "code": "failed",
+  "message": "Something failed",
+  "screen": { "type": "text", "data": "envelope screen" }
+}

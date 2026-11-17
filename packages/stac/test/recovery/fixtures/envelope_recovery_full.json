@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "code": "needs_recovery",
+  "message": "The request needs a recovery step",
+  "recovery": {
+    "key": "recovery-1",
+    "recover": [
+      {
+        "actionType": "networkRequest",
+        "url": "https://x.test/recover",
+        "method": "post",
+        "onSuccess": {
+          "actionType": "setState",
+          "values": {
+            "global.ctx": { "$state": "response.body.value" }
+          }
+        }
+      },
+      { "actionType": "recoveryOutcome", "result": "success" }
+    ],
+    "retry": {
+      "overrides": {
+        "headers": { "X-Extra": "e" }
+      },
+      "removeHeaders": ["X-Plain"]
+    },
+    "onFailure": { "actionType": "incrementState", "key": "global.failed" },
+    "onUnavailable": [
+      { "actionType": "incrementState", "key": "global.unavailable" }
+    ],
+    "timeoutMs": 5000
+  }
+}
