@@ -15,3 +15,4 @@ export 'package:stac/src/parsers/actions/stac_append_state/stac_append_state_act
 export 'package:stac/src/parsers/actions/stac_remove_from_state/stac_remove_from_state_action_parser.dart';
 export 'package:stac/src/parsers/actions/stac_toggle_item/stac_toggle_item_action_parser.dart';
 export 'package:stac/src/parsers/actions/stac_cancel_request/stac_cancel_request_parser.dart';
+export 'package:stac/src/parsers/actions/stac_recovery_outcome/stac_recovery_outcome_parser.dart';

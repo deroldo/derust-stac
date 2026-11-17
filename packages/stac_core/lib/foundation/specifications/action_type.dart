@@ -36,6 +36,9 @@ enum ActionType {
   /// Wait for a specified duration before proceeding.
   delay,
 
+  /// Report the result of a server-driven recovery (inside `recover`).
+  recoveryOutcome,
+
   /// Write several state keys at once.
   setState,
 

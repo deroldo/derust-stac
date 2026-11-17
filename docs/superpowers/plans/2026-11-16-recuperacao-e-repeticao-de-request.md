@@ -125,31 +125,31 @@ Contexto de codigo (ler antes de qualquer tarefa): `packages/stac/lib/src/servic
 
 ---
 
-## Task 4 — Action `recoveryOutcome`, resultado e trava G7-B (MEDIO)
+## Task 4 — Action `recoveryOutcome`, resultado e trava G7-B (MEDIO) — CONCLUIDA
 
 **Depende de:** T3. **Atende:** Plano 4.3, G2, G7 (opcao B).
 
 **Arquivos:** tipo em `packages/stac_core/lib/foundation/specifications/action_type.dart` (`recoveryOutcome`), modelo `packages/stac_core/lib/actions/stac_recovery_outcome/stac_recovery_outcome.dart` (`result: success|failure|unavailable`, aceita `condition` como as demais actions), export, `melos run build`; parser em `packages/stac/lib/src/parsers/actions/stac_recovery_outcome/`, registrado em `_actionParsers` de `stac_service.dart`; DSL no `stac_core`.
 
 **Passos:**
-- [ ] Modelo + parser + registro; o parser emite o resultado no contexto do `StacRecoveryRun` corrente (via `Zone`); fora de uma recuperacao: log e no-op. Primeira emissao vence.
-- [ ] Deducao padrao (M6) pelos `networkRequest` executados diretamente por `recover` quando nenhuma emissao explicita.
-- [ ] Rodar `onFailure` (resultado `failure`) e `onUnavailable` (resultado `unavailable`, nao roda `onFailure`; nada e apagado) uma vez, no escopo do primeiro request vivo; `success` nao roda nenhum.
-- [ ] **G7-B:** `onFailure` e `onUnavailable` rodam sob a mesma `Zone` de isencao: requests emitidos por eles (inclusive `navigate.request`) nao sao recuperados. Teste: `onFailure` navega para tela cujo GET responde envelope com `recovery` -> nenhuma nova recuperacao, nenhum laco.
-- [ ] Testes: primeira emissao vence; `condition`; deducao nos tres casos (5xx/rede, 4xx, 2xx); excecao = `failure`; timeout = `unavailable`.
+- [x] Modelo + parser + registro; o parser emite o resultado no contexto do `StacRecoveryRun` corrente (via `Zone`); fora de uma recuperacao: log e no-op. Primeira emissao vence.
+- [x] Deducao padrao (M6) pelos `networkRequest` executados diretamente por `recover` quando nenhuma emissao explicita.
+- [x] Rodar `onFailure` (resultado `failure`) e `onUnavailable` (resultado `unavailable`, nao roda `onFailure`; nada e apagado) uma vez, no escopo do primeiro request vivo; `success` nao roda nenhum.
+- [x] **G7-B:** `onFailure` e `onUnavailable` rodam sob a mesma `Zone` de isencao: requests emitidos por eles (inclusive `navigate.request`) nao sao recuperados. Teste: `onFailure` navega para tela cujo GET responde envelope com `recovery` -> nenhuma nova recuperacao, nenhum laco.
+- [x] Testes: primeira emissao vence; `condition`; deducao nos tres casos (5xx/rede, 4xx, 2xx); excecao = `failure`; timeout = `unavailable`.
 
 ---
 
-## Task 5 — Chamadores, erro final e erro generico (MEDIO)
+## Task 5 — Chamadores, erro final e erro generico (MEDIO) — CONCLUIDA
 
 **Depende de:** T3 (pode rodar em paralelo a T4). **Atende:** Plano 5.4, 6, G6b, G8, G13, G14, R7.
 
 **Passos:**
-- [ ] `fromNetwork`, `navigate.request`, dialog, sheet e `networkWidget` entendem `StacRecoveryException` e o envelope do erro final: envelope com `screen` -> renderiza o widget; so com `action` -> executa a action no escopo do request; sem envelope (rede, parse, outro servico) -> `genericErrorBuilder` ou widget minimo embutido (icone + "Nao foi possivel carregar"); `genericErrorBuilder: (_,__)=>SizedBox()` desliga. Remover o comportamento "erro vira `SizedBox` em release".
-- [ ] G6b: se `onFailure` rodou, o chamador nao renderiza o erro final (continua em `response` do `onError`).
-- [ ] `onError`/`onFinally` do `StacNetworkRequest` carregado por `fromNetwork`/`navigate` passam a ser honrados.
-- [ ] `networkRequest`: roda o `onError` do proprio request com `response` = erro final (nunca no meio da recuperacao), sempre `onFinally`, e **depois** executa a `action` do envelope (G13); `screen` nao se aplica. `onSuccess` roda apos a repeticao bem sucedida.
-- [ ] Testes de widget: `fromNetwork` recuperavel renderiza a tela; irrecuperavel renderiza o `screen` do erro final ou o generico, nunca branco; `networkRequest` `onSuccess` apos repeticao, nunca `onError` intermediario, `onFinally` sempre; `onError` do model em `navigate.request`; ordem `onError` -> `action` (G13).
+- [x] `fromNetwork`, `navigate.request`, dialog, sheet e `networkWidget` entendem `StacRecoveryException` e o envelope do erro final: envelope com `screen` -> renderiza o widget; so com `action` -> executa a action no escopo do request; sem envelope (rede, parse, outro servico) -> `genericErrorBuilder` ou widget minimo embutido (icone + "Nao foi possivel carregar"); `genericErrorBuilder: (_,__)=>SizedBox()` desliga. Remover o comportamento "erro vira `SizedBox` em release".
+- [x] G6b: se `onFailure` rodou, o chamador nao renderiza o erro final (continua em `response` do `onError`).
+- [x] `onError`/`onFinally` do `StacNetworkRequest` carregado por `fromNetwork`/`navigate` passam a ser honrados.
+- [x] `networkRequest`: roda o `onError` do proprio request com `response` = erro final (nunca no meio da recuperacao), sempre `onFinally`, e **depois** executa a `action` do envelope (G13); `screen` nao se aplica. `onSuccess` roda apos a repeticao bem sucedida.
+- [x] Testes de widget: `fromNetwork` recuperavel renderiza a tela; irrecuperavel renderiza o `screen` do erro final ou o generico, nunca branco; `networkRequest` `onSuccess` apos repeticao, nunca `onError` intermediario, `onFinally` sempre; `onError` do model em `navigate.request`; ordem `onError` -> `action` (G13).
 
 **Revisao:** R7 — mudar o comportamento de telas existentes; conferir testes existentes e playground.
 

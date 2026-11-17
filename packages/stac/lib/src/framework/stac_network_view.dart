@@ -1,9 +1,16 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:stac/src/recovery/stac_recovery_exception.dart';
+import 'package:stac/src/recovery/stac_request_callbacks.dart';
 import 'package:stac/src/recovery/stac_request_template.dart';
 import 'package:stac/src/services/stac_network_service.dart';
+import 'package:stac/src/state/stac_action_vars.dart';
+import 'package:stac/src/state/stac_global_state.dart';
 import 'package:stac/src/state/stac_scope.dart';
 import 'package:stac_core/actions/network_request/stac_network_request.dart';
+import 'package:stac_logger/stac_logger.dart';
 
 /// One request started by `Stac.fromNetwork`, with the life it owns: a
 /// `CancelToken` cancelled when the view that shows it is disposed, and the
@@ -40,7 +47,13 @@ class StacNetworkLoad {
       cancelToken: token,
       template: template,
     );
-    return StacNetworkLoad._(token, future, disposed);
+    final load = StacNetworkLoad._(token, future, disposed);
+    if (context.mounted) {
+      unawaited(
+        load._runCallbacks(request, StacCapturedScope.capture(context)),
+      );
+    }
+    return load;
   }
 
   final CancelToken token;
@@ -50,6 +63,70 @@ class StacNetworkLoad {
   /// Whether the view still wants the response: not disposed and the request
   /// not cancelled.
   bool alive() => !_disposed.value && !token.isCancelled;
+
+  /// Runs what the request carries for its end: `onError` (only when it
+  /// failed), `onFinally` (always) and, after them, the `action` of the final
+  /// error envelope (G13; not when `onFailure`/`onUnavailable` already ran,
+  /// G6b), with `response` being the final answer. Once per load, in the scope
+  /// captured when the request started.
+  Future<void> _runCallbacks(
+    StacNetworkRequest request,
+    StacCapturedScope captured,
+  ) async {
+    Response<dynamic>? response;
+    Object? error;
+    try {
+      response = await future;
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.cancel) return;
+      error = e;
+      response = e.response;
+    } catch (e) {
+      error = e;
+    }
+    final action =
+        error == null || (error is StacRecoveryException && error.hookRan)
+        ? null
+        : stacEnvelopeOf(error)?.action;
+    if (request.onFinally == null &&
+        (error == null || (request.onError == null && action == null))) {
+      return;
+    }
+    bool alive() =>
+        this.alive() && (captured.hasScreenStore || captured.origin.mounted);
+    if (!alive()) return;
+    try {
+      await runWithStacCapturedScope<void>(
+        captured,
+        () => runWithStacActionVars<void>(
+          {'response': stacResponseVars(response)},
+          () async {
+            // The origin may be gone: everything reads the captured scope.
+            // ignore: use_build_context_synchronously
+            final context = captured.origin;
+            if (error != null &&
+                !await stacRunRequestActions(context, request.onError, alive)) {
+              return;
+            }
+            if (!await stacRunRequestActions(
+              // ignore: use_build_context_synchronously
+              context,
+              request.onFinally,
+              alive,
+            )) {
+              return;
+            }
+            if (action != null) {
+              // ignore: use_build_context_synchronously
+              await stacRunRequestActions(context, action, alive);
+            }
+          },
+        ),
+      );
+    } catch (e) {
+      Log.e(StacGlobalState.instance.redact('request callbacks failed: $e'));
+    }
+  }
 
   /// Called when the view goes away: cancels the request.
   void dispose() {

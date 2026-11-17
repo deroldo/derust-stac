@@ -25,7 +25,7 @@ Map<String, dynamic> _recovery({
   Object? onFailure,
   Object? onUnavailable,
   int? timeoutMs,
-  String refreshUrl = 'https://x.test/refresh',
+  String refreshUrl = 'https://x.test/recover-endpoint',
 }) => {
   'recover': recover ?? _refresh(url: refreshUrl),
   if (key != null || keyNull) 'key': key,
@@ -54,7 +54,9 @@ FakeResponse _envelope(
 );
 
 /// `recover`: refresh the token and keep what the bindings of `recover` see.
-Map<String, dynamic> _refresh({String url = 'https://x.test/refresh'}) => {
+Map<String, dynamic> _refresh({
+  String url = 'https://x.test/recover-endpoint',
+}) => {
   'actionType': 'networkRequest',
   'url': url,
   'method': 'post',
@@ -111,21 +113,19 @@ Map<String, dynamic> _screen(List<Map<String, dynamic>> children) => {
   'children': children,
 };
 
-class _OutcomeParser extends StacActionParser<Map<String, dynamic>> {
-  const _OutcomeParser();
+/// Simulates an action whose asynchronous work fails.
+class _ThrowParser extends StacActionParser<Map<String, dynamic>> {
+  const _ThrowParser();
 
   @override
-  String get actionType => 'testOutcome';
+  String get actionType => 'testThrow';
 
   @override
   Map<String, dynamic> getModel(Map<String, dynamic> json) => json;
 
   @override
-  FutureOr onCall(BuildContext context, Map<String, dynamic> model) {
-    StacRecoveryResult.values
-        .where((r) => r.name == model['result'])
-        .forEach(StacRecoveryRun.emitCurrent);
-  }
+  FutureOr onCall(BuildContext context, Map<String, dynamic> model) =>
+      Future<void>.error(StateError('boom'));
 }
 
 void main() {
@@ -133,13 +133,13 @@ void main() {
   final dio = Dio()..httpClientAdapter = adapter;
   final hits = <String, int>{};
 
-  /// The default server: /data needs the new token, /refresh gives it.
+  /// The default server: /data needs the new token, /recover-endpoint gives it.
   late FakeResponse Function(RequestOptions) server;
   FakeResponse defaultServer(RequestOptions o) {
     final path = o.uri.path;
     hits[path] = (hits[path] ?? 0) + 1;
     switch (path) {
-      case '/refresh':
+      case '/recover-endpoint':
         return const FakeResponse({
           'token': 'new',
         }, delay: Duration(milliseconds: 50));
@@ -155,6 +155,9 @@ void main() {
     adapter.requests.clear();
     hits.clear();
     server = defaultServer;
+    if (StacRegistry.instance.getActionParser('testThrow') == null) {
+      StacRegistry.instance.registerAction(const _ThrowParser());
+    }
     adapter.responder = (o) => server(o);
     StacRecoveryInterceptor.instance.reset();
     final store = StacGlobalState.instance.store;
@@ -168,9 +171,6 @@ void main() {
       store
         ..declare(e.key, e.value)
         ..write(e.key, e.value);
-    }
-    if (StacRegistry.instance.getActionParser('testOutcome') == null) {
-      StacRegistry.instance.registerAction(const _OutcomeParser());
     }
   });
 
@@ -253,7 +253,7 @@ void main() {
 
       expect(adapter.requests.map((r) => r.uri.path), [
         '/data',
-        '/refresh',
+        '/recover-endpoint',
         '/data',
       ]);
       final first = adapter.requests.first;
@@ -284,7 +284,7 @@ void main() {
         expect(data[1].method, method.toUpperCase());
         expect(data[1].headers['X-Token'], 'new');
         if (method != 'get') expect(data[1].data, {'n': '1'});
-        expect(hits['/refresh'], 1);
+        expect(hits['/recover-endpoint'], 1);
         expect(local(tester, 'ok'), 1);
       });
     }
@@ -320,7 +320,7 @@ void main() {
       }
       await settle(tester);
 
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(sent('/data'), hasLength(10));
       final repeats = sent('/data').where((r) => r.headers['X-Token'] == 'new');
       expect(repeats.map((r) => r.headers['X-N']).toList()..sort(), tags);
@@ -346,7 +346,7 @@ void main() {
       await tester.tap(find.text('go1'));
       await tester.tap(find.text('go2'));
       await settle(tester);
-      expect(hits['/refresh'], 2);
+      expect(hits['/recover-endpoint'], 2);
       expect(local(tester, 'ok'), 2);
     });
 
@@ -357,7 +357,7 @@ void main() {
           return _envelope(
             _recovery(
               key: 'same',
-              refreshUrl: 'https://x.test/refresh?${o.headers['X-N']}',
+              refreshUrl: 'https://x.test/recover-endpoint?${o.headers['X-N']}',
             ),
             delay: const Duration(milliseconds: 20),
           );
@@ -371,7 +371,7 @@ void main() {
       await tester.tap(find.text('go1'));
       await tester.tap(find.text('go2'));
       await settle(tester);
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(local(tester, 'ok'), 2);
     });
 
@@ -393,7 +393,7 @@ void main() {
       await tester.tap(find.text('go1'));
       await tester.tap(find.text('go2'));
       await settle(tester);
-      expect(hits['/refresh'], 2);
+      expect(hits['/recover-endpoint'], 2);
       expect(local(tester, 'ok'), 2);
       expect(StacRecoveryInterceptor.instance.runsInFlight, 0);
     });
@@ -420,7 +420,7 @@ void main() {
       await settle(tester, 700);
 
       // B recovered at ~70ms; A's 401 only arrived at 300ms, after it.
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(sent('/data'), hasLength(4));
       expect(local(tester, 'ok', 'A'), 2);
       expect(local(tester, 'err', 'A'), 0);
@@ -455,7 +455,7 @@ void main() {
           .then((r) => response = r);
       await settle(tester);
       expect(response?.statusCode, 200);
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(sent('/plain').map((r) => r.headers['Authorization']), [
         'old',
         'new',
@@ -485,7 +485,7 @@ void main() {
       expect(e.response?.statusCode, 403);
       expect(e.envelope?.code, 'session_expired');
       expect(e.original.response?.statusCode, 401);
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(hits['/data'], 2);
       expect(e.hookRan, isFalse);
     });
@@ -495,7 +495,7 @@ void main() {
     ) async {
       server = (o) {
         hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
-        if (o.uri.path == '/refresh') {
+        if (o.uri.path == '/recover-endpoint') {
           // The refresh itself answers with a recovery envelope.
           return _envelope(_recovery());
         }
@@ -506,9 +506,9 @@ void main() {
       expect(e.result, StacRecoveryResult.failure);
       expect(e.retried, isFalse);
       // The last request that failed in `recover` is the last error observed.
-      expect(e.lastError.requestOptions.uri.path, '/refresh');
+      expect(e.lastError.requestOptions.uri.path, '/recover-endpoint');
       expect(e.original.requestOptions.uri.path, '/data');
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(hits['/data'], 1);
       expect(StacRecoveryInterceptor.instance.runsInFlight, 0);
     });
@@ -614,7 +614,7 @@ void main() {
       expect(error, isNot(isA<StacRecoveryException>()));
       expect(sent('/data'), hasLength(1));
       // The shared execution was not stopped by one request leaving.
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(global('tok'), 'new');
     });
 
@@ -657,7 +657,7 @@ void main() {
       await settle(tester);
 
       expect(find.text('goA'), findsNothing);
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(global('tok'), 'new', reason: 'recover ran to the end');
       final data = sent('/data');
       expect(data.where((r) => r.headers['X-N'] == 'A'), hasLength(1));
@@ -674,7 +674,7 @@ void main() {
     }) async {
       server = (o) {
         hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
-        if (o.uri.path == '/refresh') return refresh;
+        if (o.uri.path == '/recover-endpoint') return refresh;
         return _envelope(recovery ?? _recovery());
       };
       return await load(tester) as StacRecoveryException;
@@ -700,7 +700,7 @@ void main() {
       expect(e.onUnavailableRan, isFalse);
       expect(global('hook'), 1);
       expect(hits['/notify'], 1);
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(e.lastError.response?.statusCode, 400);
     });
 
@@ -727,7 +727,7 @@ void main() {
     testWidgets('a network error in recover = unavailable', (tester) async {
       server = (o) {
         hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
-        if (o.uri.path == '/refresh') {
+        if (o.uri.path == '/recover-endpoint') {
           throw DioException.connectionError(
             requestOptions: o,
             reason: 'offline',
@@ -762,7 +762,7 @@ void main() {
     testWidgets('5 concurrent failures: onFailure runs once', (tester) async {
       server = (o) {
         hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
-        if (o.uri.path == '/refresh') {
+        if (o.uri.path == '/recover-endpoint') {
           return const FakeResponse({}, statusCode: 400);
         }
         return _envelope(
@@ -780,7 +780,7 @@ void main() {
         await tester.tap(find.text('go$t'));
       }
       await settle(tester);
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(global('hook'), 1);
       expect(local(tester, 'err'), 5, reason: 'each caller ends in onError');
       expect(local(tester, 'fin'), 5);
@@ -789,7 +789,7 @@ void main() {
     testWidgets('nothing runs when no request is alive', (tester) async {
       server = (o) {
         hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
-        if (o.uri.path == '/refresh') {
+        if (o.uri.path == '/recover-endpoint') {
           return const FakeResponse(
             {},
             statusCode: 400,
@@ -808,7 +808,7 @@ void main() {
             Future<void>.delayed(const Duration(milliseconds: 20), l.dispose),
       );
       await settle(tester);
-      expect(hits['/refresh'], 1);
+      expect(hits['/recover-endpoint'], 1);
       expect(global('hook'), 0);
     });
 
@@ -834,7 +834,7 @@ void main() {
       // 503 would be `unavailable`; the recovery says `success`.
       server = (o) {
         hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
-        if (o.uri.path == '/refresh') {
+        if (o.uri.path == '/recover-endpoint') {
           return const FakeResponse({}, statusCode: 503);
         }
         return o.headers['X-Token'] == 'old'
@@ -842,8 +842,8 @@ void main() {
                 _recovery(
                   recover: [
                     _refresh(),
-                    {'actionType': 'testOutcome', 'result': 'success'},
-                    {'actionType': 'testOutcome', 'result': 'failure'},
+                    {'actionType': 'recoveryOutcome', 'result': 'success'},
+                    {'actionType': 'recoveryOutcome', 'result': 'failure'},
                   ],
                 ),
               )
@@ -857,12 +857,14 @@ void main() {
       hits.clear();
       server = (o) {
         hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
-        if (o.uri.path == '/refresh') return const FakeResponse({'token': 'x'});
+        if (o.uri.path == '/recover-endpoint') {
+          return const FakeResponse({'token': 'x'});
+        }
         return _envelope(
           _recovery(
             recover: [
               _refresh(),
-              {'actionType': 'testOutcome', 'result': 'failure'},
+              {'actionType': 'recoveryOutcome', 'result': 'failure'},
             ],
           ),
         );
@@ -872,6 +874,110 @@ void main() {
         (error as StacRecoveryException).result,
         StacRecoveryResult.failure,
       );
+    });
+
+    testWidgets('condition: a false condition does not emit', (tester) async {
+      server = (o) {
+        hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
+        if (o.uri.path == '/recover-endpoint') {
+          return const FakeResponse({'token': 'x'});
+        }
+        return _envelope(
+          _recovery(
+            recover: [
+              _refresh(),
+              {
+                'actionType': 'recoveryOutcome',
+                'result': 'failure',
+                'condition': false,
+              },
+              {
+                'actionType': 'recoveryOutcome',
+                'result': 'unavailable',
+                'condition': true,
+              },
+            ],
+          ),
+        );
+      };
+      final e = await load(tester) as StacRecoveryException;
+      expect(e.result, StacRecoveryResult.unavailable);
+    });
+
+    testWidgets('an exception in recover = failure', (tester) async {
+      server = (o) {
+        hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
+        return _envelope(
+          _recovery(
+            recover: [
+              {'actionType': 'testThrow'},
+            ],
+            onFailure: {'actionType': 'incrementState', 'key': 'global.hook'},
+          ),
+        );
+      };
+      final e = await load(tester) as StacRecoveryException;
+      expect(e.result, StacRecoveryResult.failure);
+      expect(global('hook'), 1);
+    });
+
+    testWidgets('recoveryOutcome outside a recovery is a no-op', (
+      tester,
+    ) async {
+      await pumpScreen(tester, [
+        _button('1', {'actionType': 'recoveryOutcome', 'result': 'failure'}),
+      ]);
+      await tester.tap(find.text('go1'));
+      await settle(tester);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('recoveryOutcome inside a hook stays a no-op', (tester) async {
+      final e = await failed(
+        tester,
+        const FakeResponse({}, statusCode: 400),
+        recovery: _recovery(
+          onFailure: [
+            {'actionType': 'recoveryOutcome', 'result': 'success'},
+            {'actionType': 'incrementState', 'key': 'global.hook'},
+          ],
+        ),
+      );
+      expect(e.result, StacRecoveryResult.failure);
+      expect(global('hook'), 1);
+    });
+
+    testWidgets('G7-B: onFailure that requests an envelope does not recover', (
+      tester,
+    ) async {
+      for (final hook in [
+        {'actionType': 'networkRequest', 'url': 'https://x.test/target'},
+        {
+          'actionType': 'navigate',
+          'request': {'url': 'https://x.test/target', 'method': 'get'},
+        },
+      ]) {
+        StacRecoveryInterceptor.instance.reset();
+        hits.clear();
+        server = (o) {
+          hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
+          if (o.uri.path == '/recover-endpoint') {
+            return const FakeResponse({}, statusCode: 400);
+          }
+          // /data and /target both answer with a recovery envelope.
+          return _envelope(_recovery(onFailure: hook));
+        };
+        final e = await load(tester) as StacRecoveryException;
+        await settle(tester);
+        expect(e.result, StacRecoveryResult.failure);
+        expect(
+          hits['/recover-endpoint'],
+          1,
+          reason: 'no second recovery (${hook['actionType']})',
+        );
+        expect(hits['/target'], 1, reason: 'the hook request ran once');
+        expect(hits['/data'], 1);
+      }
     });
   });
 

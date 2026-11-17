@@ -4,7 +4,10 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:stac/src/framework/framework.dart';
+import 'package:stac/src/recovery/stac_error_envelope.dart';
+import 'package:stac/src/recovery/stac_recovery_exception.dart';
 import 'package:stac/src/recovery/stac_recovery_run.dart';
+import 'package:stac/src/recovery/stac_request_callbacks.dart';
 import 'package:stac/src/recovery/stac_request_template.dart';
 import 'package:stac/src/services/stac_network_service.dart';
 import 'package:stac/src/state/stac_action_vars.dart';
@@ -75,6 +78,8 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     // The trigger context may be unmounted below on purpose: everything that
     // reads it goes through the captured scope (see StacCapturedScope).
     Response<dynamic>? response;
+    StacErrorEnvelope? envelope;
+    var hookRan = false;
     try {
       response = await StacNetworkService.request(
         // ignore: use_build_context_synchronously
@@ -94,6 +99,8 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) return null;
       response = e.response;
+      envelope = stacEnvelopeOf(e);
+      hookRan = e is StacRecoveryException && e.hookRan;
       Log.e(StacGlobalState.instance.redact('${e.response ?? e}'));
     } catch (e) {
       Log.e(
@@ -108,7 +115,7 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     final succeeded = statusCode != null && statusCode ~/ 100 == 2;
 
     return runWithStacActionVars<dynamic>(
-      {'response': _responseVars(response)},
+      {'response': stacResponseVars(response)},
       () async {
         if (!await _runActions(
           context,
@@ -119,6 +126,15 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
         }
         // ignore: use_build_context_synchronously
         if (!await _runActions(context, model.onFinally, alive)) return null;
+        // G13: the server's `action` runs after `onError`/`onFinally`, in the
+        // scope of the request. Not when `onFailure`/`onUnavailable` already
+        // handled the failure (G6b). `screen` does not apply to an action.
+        if (!succeeded && !hookRan && envelope?.action != null) {
+          // ignore: use_build_context_synchronously
+          if (!await _runActions(context, envelope!.action, alive)) {
+            return null;
+          }
+        }
         // ignore: use_build_context_synchronously
         return stacRunNested(
           () => _runLegacyResult(context, model, response, alive),
@@ -161,88 +177,11 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
     }
   }
 
-  /// Actions that open something and finish only when it is closed.
-  static final Set<String> _navigationActions = {
-    ActionType.navigate.name,
-    ActionType.showDialog.name,
-    ActionType.showModalBottomSheet.name,
-  };
-
-  /// Runs one action or a list of actions in sequence, awaiting each (except
-  /// [_navigationActions], which are fired and not awaited). Returns
-  /// `false` as soon as the request is no longer [alive] (the rest is
-  /// dropped).
   Future<bool> _runActions(
     BuildContext context,
     Object? actions,
     bool Function() alive,
-  ) =>
-      // Callbacks are not the request of a recovery's `recover` themselves.
-      stacRunNested(() => _runActionList(context, actions, alive));
-
-  Future<bool> _runActionList(
-    BuildContext context,
-    Object? actions,
-    bool Function() alive,
-  ) async {
-    if (!alive()) return false;
-    if (actions == null) return true;
-    final list = actions is List ? actions : [actions];
-    for (final action in list) {
-      if (action is! Map) {
-        Log.e(
-          StacGlobalState.instance.redact(
-            'networkRequest callback expects actions, got $action',
-          ),
-        );
-        continue;
-      }
-      final json = Map<String, dynamic>.from(action);
-      if (_navigationActions.contains(json['actionType'])) {
-        // Opening a screen/dialog completes only when it is closed (and
-        // `pushReplacement` never completes for the origin): waiting would
-        // hold back `onFinally`. The navigate action runs its own
-        // `onResult`/`onCancel` when the destination returns.
-        final pending = Stac.onCallFromJson(json, context);
-        if (pending is Future) {
-          unawaited(
-            pending.then<void>(
-              (_) {},
-              onError: (Object e) => Log.e(
-                StacGlobalState.instance.redact('navigation action failed: $e'),
-              ),
-            ),
-          );
-        }
-      } else {
-        await Stac.onCallFromJson(json, context);
-      }
-      if (!alive()) return false;
-    }
-    return true;
-  }
-
-  /// `response` as seen by bindings: `{body, statusCode, headers}`.
-  static Map<String, Object?> _responseVars(Response<dynamic>? response) {
-    Object? body = response?.data;
-    if (body is String) {
-      try {
-        body = jsonDecode(body);
-      } catch (_) {
-        // Not JSON: keep the text.
-      }
-    }
-    return {
-      'body': body,
-      'statusCode': response?.statusCode,
-      'headers': {
-        for (final e
-            in response?.headers.map.entries ??
-                const <MapEntry<String, List<String>>>[])
-          e.key: e.value,
-      },
-    };
-  }
+  ) => stacRunRequestActions(context, actions, alive);
 
   /// `bodyFromState`: `{key: value}` of the listed keys, without `secure`
   /// ones, evaluated now (at trigger time). An explicit `body` wins.

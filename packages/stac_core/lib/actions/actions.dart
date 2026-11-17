@@ -6,6 +6,7 @@ export 'network_request/stac_network_request.dart';
 export 'cancel_request/stac_cancel_request.dart';
 export 'set_value/stac_set_value_action.dart';
 export 'delay/stac_delay_action.dart';
+export 'stac_recovery_outcome/stac_recovery_outcome.dart';
 export 'dialog/stac_dialog_action.dart';
 export 'snack_bar/stac_snack_bar.dart';
 export 'snack_bar/stac_snack_bar_action.dart';

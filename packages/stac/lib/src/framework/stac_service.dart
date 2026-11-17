@@ -9,6 +9,7 @@ import 'package:stac/src/framework/stac.dart';
 import 'package:stac/src/framework/stac_error.dart';
 import 'package:stac/src/framework/stac_network_view.dart';
 import 'package:stac/src/framework/stac_registry.dart';
+import 'package:stac/src/recovery/stac_recovery_exception.dart';
 import 'package:stac/src/recovery/stac_request_template.dart';
 import 'package:stac/src/models/stac_cache_config.dart';
 import 'package:stac/src/parsers/actions/stac_form_validate/stac_form_validate_parser.dart';
@@ -167,6 +168,7 @@ class StacService {
     const StacSetValueActionParser(),
     const StacMultiActionParser(),
     const StacDelayActionParser(),
+    const StacRecoveryOutcomeParser(),
     const StacSetStateActionParser(),
     const StacIncrementStateActionParser(),
     const StacDecrementStateActionParser(),
@@ -621,28 +623,26 @@ class StacService {
             break;
           case ConnectionState.done:
             if (snapshot.hasData) {
-              final json = jsonDecode(snapshot.data.toString());
-              return StacService.fromJson(json, context) ?? const SizedBox();
-            } else if (snapshot.hasError) {
-              _logError(
-                category: 'Network Request Error',
-                type: 'network',
-                error: snapshot.error ?? 'Unknown network error',
-                stackTrace: snapshot.stackTrace,
-              );
-
-              if (errorWidget != null) {
-                return errorWidget(context, snapshot.error);
-              } else if (_showErrorWidgets && kDebugMode) {
-                return _buildErrorWidget(
-                  context: context,
-                  error: StacError(
-                    type: 'network',
-                    error: snapshot.error ?? 'Unknown network error',
-                    stackTrace: snapshot.stackTrace,
-                  ),
+              try {
+                final json = jsonDecode(snapshot.data.toString());
+                final widget = StacService.fromJson(json, context);
+                if (widget != null) return widget;
+                return _finalError(
+                  context,
+                  const FormatException('The response is not a Stac widget'),
+                  null,
+                  null,
                 );
+              } catch (e, st) {
+                return _finalError(context, e, st, errorWidget);
               }
+            } else if (snapshot.hasError) {
+              return _finalError(
+                context,
+                snapshot.error ?? 'Unknown network error',
+                snapshot.stackTrace,
+                errorWidget,
+              );
             }
             break;
           default:
@@ -651,6 +651,46 @@ class StacService {
         return const SizedBox();
       },
     );
+  }
+
+  /// What a failed `fromNetwork` shows (never a blank screen, except when the
+  /// server's `onFailure`/`onUnavailable` already took over, G6b):
+  ///
+  /// 1. the `screen` of the server error envelope, rendered here;
+  /// 2. the caller's [errorWidget];
+  /// 3. `Stac.genericErrorBuilder`, or the built-in minimal widget (icon and
+  ///    "Could not load"). `genericErrorBuilder: (_, __) => SizedBox()` turns
+  ///    it off.
+  ///
+  /// An envelope with only an `action` shows nothing: the action runs (see
+  /// [StacNetworkLoad]).
+  static Widget _finalError(
+    BuildContext context,
+    Object error,
+    StackTrace? stackTrace,
+    ErrorWidgetBuilder? errorWidget,
+  ) {
+    _logError(
+      category: 'Network Request Error',
+      type: 'network',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    if (error is StacRecoveryException && error.hookRan) {
+      return const SizedBox();
+    }
+    final envelope = stacEnvelopeOf(error);
+    final screen = envelope?.screen;
+    if (screen != null) {
+      final widget = StacService.fromJson(screen, context);
+      if (widget != null) return widget;
+    } else if (envelope?.action != null) {
+      return const SizedBox();
+    }
+    if (errorWidget != null) return errorWidget(context, error);
+    final builder = Stac.genericErrorBuilder;
+    if (builder != null) return builder(context, error);
+    return const _StacGenericError();
   }
 
   static Widget fromAssets(
@@ -765,4 +805,21 @@ class StacService {
       stackTrace: error.stackTrace,
     );
   }
+}
+
+/// The built-in generic error of `fromNetwork` and friends (G14).
+class _StacGenericError extends StatelessWidget {
+  const _StacGenericError();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+        const SizedBox(height: 8),
+        const Text('Could not load'),
+      ],
+    ),
+  );
 }
