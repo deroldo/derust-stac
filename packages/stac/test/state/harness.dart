@@ -13,17 +13,25 @@ class FakeResponse {
     this.body, {
     this.statusCode = 200,
     this.delay = Duration.zero,
+    this.headers,
   });
 
   final Object? body;
   final int statusCode;
   final Duration delay;
+
+  /// Response headers; defaults to `content-type: application/json`. A
+  /// `content-type` given here replaces the default one.
+  final Map<String, List<String>>? headers;
 }
 
 /// [HttpClientAdapter] serving queued responses in order, with optional delay.
 class FakeDioAdapter implements HttpClientAdapter {
   final List<FakeResponse> _queue = [];
   final List<RequestOptions> requests = [];
+
+  /// When set, answers every request instead of the queue.
+  FakeResponse Function(RequestOptions options)? responder;
 
   void enqueue(FakeResponse response) => _queue.add(response);
 
@@ -34,10 +42,15 @@ class FakeDioAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     requests.add(options);
-    if (_queue.isEmpty) {
-      throw StateError('FakeDioAdapter: no queued response');
+    final FakeResponse response;
+    if (responder != null) {
+      response = responder!(options);
+    } else {
+      if (_queue.isEmpty) {
+        throw StateError('FakeDioAdapter: no queued response');
+      }
+      response = _queue.removeAt(0);
     }
-    final response = _queue.removeAt(0);
     if (response.delay > Duration.zero) {
       await Future<void>.delayed(response.delay);
     }
@@ -47,6 +60,7 @@ class FakeDioAdapter implements HttpClientAdapter {
       response.statusCode,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
+        ...?response.headers,
       },
     );
   }

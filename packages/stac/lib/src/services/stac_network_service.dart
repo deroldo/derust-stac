@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:stac/src/framework/framework.dart';
+import 'package:stac/src/recovery/stac_recovery_interceptor.dart';
+import 'package:stac/src/recovery/stac_recovery_run.dart';
 import 'package:stac/src/recovery/stac_request_template.dart';
 import 'package:stac/src/state/stac_binding.dart';
 import 'package:stac/src/state/stac_scope.dart';
@@ -12,7 +14,21 @@ class StacNetworkService {
 
   static late Dio _dio;
 
-  static void initialize(Dio dio) => _dio = dio;
+  static Dio? _installedOn;
+
+  /// Uses [dio] for every request and installs the recovery interceptor on it
+  /// (once: initializing again with the same Dio does not duplicate it).
+  static void initialize(Dio dio) {
+    _dio = dio;
+    final previous = _installedOn;
+    if (previous != null && !identical(previous, dio)) {
+      previous.interceptors.remove(StacRecoveryInterceptor.instance);
+    }
+    if (!dio.interceptors.any((i) => i is StacRecoveryInterceptor)) {
+      dio.interceptors.add(StacRecoveryInterceptor.instance);
+    }
+    _installedOn = dio;
+  }
 
   /// Resolves the `{"$state": ...}` / `{"$expr": ...}` bindings that sit in
   /// the data keys of [request] (`headers`, `body`, `queryParameters`, ...)
@@ -196,8 +212,10 @@ class StacNetworkService {
     StacNetworkRequest request, {
     StacRequestTemplate? template,
   }) {
+    final direct = StacRecoveryRun.currentDirect;
     final extra = <String, dynamic>{
       stacTemplateExtraKey: ?template,
+      stacRecoveryRunExtraKey: ?direct,
       if (stacRecoveryExemptInZone) stacRecoveryExemptExtraKey: true,
       if (stacBodyIsUnreplayable(request.body)) stacRetryUnsafeExtraKey: true,
     };

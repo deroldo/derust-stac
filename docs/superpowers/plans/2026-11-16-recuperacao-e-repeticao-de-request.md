@@ -107,19 +107,19 @@ Contexto de codigo (ler antes de qualquer tarefa): `packages/stac/lib/src/servic
 
 ---
 
-## Task 3 — Interceptor e execucao da recuperacao (COMPLEXO)
+## Task 3 — Interceptor e execucao da recuperacao (COMPLEXO) — CONCLUIDA
 
 **Depende de:** T1, T2. **Atende:** Plano 3, 4.2, 4.4, 4.5, 4.6, 5.1.
 
 **Arquivos (novos):** `recovery/stac_recovery_interceptor.dart`, `recovery/stac_recovery_run.dart`, `recovery/stac_recovery_exception.dart`; instalar o interceptor em `StacNetworkService.initialize` sobre o Dio do app.
 
 **Passos:**
-- [ ] `onError` do interceptor: se request isento (M3) ou sem envelope reconhecido ou envelope sem `recovery` ou `alive()` falso -> passa adiante (erro comum; se havia envelope, fica anexado ao erro para a T5).
-- [ ] Com `recovery`: obter/criar `StacRecoveryRun` por identidade (M4; `key`, senao hash do JSON canonico de `recover` com chaves ordenadas; `keyDisabled` = sem coalescencia). Geracao: se `request.startedAt < lastSuccessAt`, so repete.
-- [ ] Executar `recover` (action ou lista em sequencia, como `multiAction`) no escopo do request lider (M5), sob `Zone` de isencao; variaveis somente-leitura `request` e `failure`; timeout (`timeoutMs`, default 20 s = `unavailable`).
-- [ ] `success` -> repete via `retryRequest` (T2); sucesso da repeticao resolve normalmente; falha da repeticao -> `StacRecoveryException` com o erro da repeticao, SEM nova recuperacao. `failure`/`unavailable` -> resultados entregues a T4 para rodar `onFailure`/`onUnavailable`; chamador recebe `StacRecoveryException` com o ultimo erro (M7).
-- [ ] Cancelamento: request cancelado durante a recuperacao nao e repetido; a execucao compartilhada continua. Lider morre: M5. Corpo nao reutilizavel: nao repete, log.
-- [ ] Testes (adapter fake): 1 recuperacao + repeticao com header novo; 5 requests concorrentes mesma identidade = 1 `recover`, cada um repete o proprio; geracao; repeticao que falha = erro da repeticao e nenhuma nova recuperacao; requests do `recover` e a repeticao com envelope `recovery` na resposta nao recuperam; qualquer verbo; cancelamento; lider morre; `key: null` desliga; sem envelope = comportamento atual; erro de rede sem resposta nunca recuperado.
+- [x] `onError` do interceptor: se request isento (M3) ou sem envelope reconhecido ou envelope sem `recovery` ou `alive()` falso -> passa adiante (erro comum; se havia envelope, fica anexado ao erro para a T5).
+- [x] Com `recovery`: obter/criar `StacRecoveryRun` por identidade (M4; `key`, senao hash do JSON canonico de `recover` com chaves ordenadas; `keyDisabled` = sem coalescencia). Geracao: se `request.startedAt < lastSuccessAt`, so repete.
+- [x] Executar `recover` (action ou lista em sequencia, como `multiAction`) no escopo do request lider (M5), sob `Zone` de isencao; variaveis somente-leitura `request` e `failure`; timeout (`timeoutMs`, default 20 s = `unavailable`).
+- [x] `success` -> repete via `retryRequest` (T2); sucesso da repeticao resolve normalmente; falha da repeticao -> `StacRecoveryException` com o erro da repeticao, SEM nova recuperacao. `failure`/`unavailable` -> resultados entregues a T4 para rodar `onFailure`/`onUnavailable`; chamador recebe `StacRecoveryException` com o ultimo erro (M7).
+- [x] Cancelamento: request cancelado durante a recuperacao nao e repetido; a execucao compartilhada continua. Lider morre: M5. Corpo nao reutilizavel: nao repete, log.
+- [x] Testes (adapter fake): 1 recuperacao + repeticao com header novo; 5 requests concorrentes mesma identidade = 1 `recover`, cada um repete o proprio; geracao; repeticao que falha = erro da repeticao e nenhuma nova recuperacao; requests do `recover` e a repeticao com envelope `recovery` na resposta nao recuperam; qualquer verbo; cancelamento; lider morre; `key: null` desliga; sem envelope = comportamento atual; erro de rede sem resposta nunca recuperado.
 
 **Revisao:** garantir ausencia de recursao e de espera circular (run esperando a si mesmo); logs com `redact`.
 
@@ -163,7 +163,7 @@ Contexto de codigo (ler antes de qualquer tarefa): `packages/stac/lib/src/servic
 - [ ] Spike S1 em Chrome real com o app web de referencia (backoffice, no repo do Tapbook, ou um app minimo em `stac_playground`/`examples/`): comparar tres variantes: **A** Navigator 1.0 atual (reproduzir o relato: voltar limitado apos F5, avancar nao funciona); **B** Router API com a pilha em `RouteInformation.state`/`history.state`; **C** Router API com a pilha em `sessionStorage`. Matriz de cenarios (Plano 7.3): F5 em profundidade 3; voltar 2x pos-F5; avancar apos voltar; voltar+navegar trunca o futuro; `pushReplacement` sem entrada extra e `pushAndRemoveAll` + voltar nao reabre telas anteriores (epoch); URL com query em F5/voltar/avancar; aba nova e aba duplicada (sem/com `state`); recuperacao (T3) durante voltar/avancar. Registrar o resultado em `docs/` (nota curta) e medir o custo (muda o `MaterialApp`, como `navigate` abre rotas).
 - [ ] Se o ambiente nao permitir navegador real, **parar e reportar** ao coordenador; nao fixar a base por hipotese.
 - [ ] Decidir A/B/C com o resultado e **registrar a decisao (N2, N3, N5) para o usuario confirmar** antes de implementar a opcao escolhida.
-- [ ] Implementar `StacRouter` (pacote `stac`): `/screens/x?q=1` -> `GET <base><backendPrefix>/screens/x?q=1`, sem splash; config `baseUrl`, `screensPrefix`, `backendPrefix`, `loading`, `initialFallback`; pilha local por aba, reconstruida no F5, `epoch` para `pushAndRemoveAll`; no mobile deve comportar-se como a pilha nativa. Dialogs/sheets fora da pilha de URLs. A URL reconstroi a tela; `navigate.params`/`onResult` nao sobrevivem ao F5. Pilha sem segredos.
+- [ ] Implementar `StacRouter` (pacote `stac`): `<path>?q=1` -> `GET <base><backendPrefix><path>?q=1` (nenhuma rota/path fixo no codigo, defaults, testes, exemplos ou docs: tudo configuravel por quem usa o framework; qualquer `/screens/...` e so exemplo ilustrativo), sem splash; config `baseUrl`, `screensPrefix`, `backendPrefix` (todos sem default fixo, definidos pelo app), `loading`, `initialFallback`; pilha local por aba, reconstruida no F5, `epoch` para `pushAndRemoveAll`; no mobile deve comportar-se como a pilha nativa. Dialogs/sheets fora da pilha de URLs. A URL reconstroi a tela; `navigate.params`/`onResult` nao sobrevivem ao F5. Pilha sem segredos.
 - [ ] Testes: unidade da pilha (push/replace/truncar futuro/epoch/limite de profundidade) e a matriz do spike automatizada (Chrome/Playwright) quando viavel.
 
 ---

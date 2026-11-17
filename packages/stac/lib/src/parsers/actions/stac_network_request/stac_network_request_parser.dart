@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:stac/src/framework/framework.dart';
+import 'package:stac/src/recovery/stac_recovery_run.dart';
 import 'package:stac/src/recovery/stac_request_template.dart';
 import 'package:stac/src/services/stac_network_service.dart';
 import 'package:stac/src/state/stac_action_vars.dart';
@@ -119,7 +120,9 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
         // ignore: use_build_context_synchronously
         if (!await _runActions(context, model.onFinally, alive)) return null;
         // ignore: use_build_context_synchronously
-        return _runLegacyResult(context, model, response, alive);
+        return stacRunNested(
+          () => _runLegacyResult(context, model, response, alive),
+        );
       },
     );
   }
@@ -170,6 +173,14 @@ class StacNetworkRequestParser extends StacActionParser<StacNetworkRequest> {
   /// `false` as soon as the request is no longer [alive] (the rest is
   /// dropped).
   Future<bool> _runActions(
+    BuildContext context,
+    Object? actions,
+    bool Function() alive,
+  ) =>
+      // Callbacks are not the request of a recovery's `recover` themselves.
+      stacRunNested(() => _runActionList(context, actions, alive));
+
+  Future<bool> _runActionList(
     BuildContext context,
     Object? actions,
     bool Function() alive,

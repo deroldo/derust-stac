@@ -429,6 +429,12 @@ class StacCapturedScope {
         StacStateScope.requestsOf(context),
       );
 
+  /// The same scopes with a request registry of its own, so what runs in the
+  /// copy is not cancelled when the origin screen closes (a recovery outlives
+  /// the screen of the request that led it).
+  StacCapturedScope withOwnRequests() =>
+      StacCapturedScope._(origin, scope, StacRequestRegistry());
+
   /// The capture of the running chain, when [context] is its origin.
   static StacCapturedScope? forContext(BuildContext context) {
     final captured = Zone.current[_capturedScopeKey];

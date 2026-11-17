@@ -346,7 +346,7 @@ void main() {
   group('fromNetwork views', () {
     Map<String, dynamic> netRequest() => {
       'actionType': 'networkRequest',
-      'url': 'https://x.test/screen',
+      'url': 'https://x.test/resource',
       'headers': {
         'X-Token': {r'$state': 'global.tok'},
       },
