@@ -140,6 +140,8 @@ Contexto de codigo (ler antes de qualquer tarefa): `packages/stac/lib/src/servic
 
 ---
 
+> **Correcao pos-T4 (bug de run pendente):** um `navigate` (ex.: `pushAndRemoveAll`) ou `showDialog`/sheet aninhado em `multiAction` (sync ou nao) dentro de `recover`/`onFailure`/`onUnavailable` prendia a `StacRecoveryRun` (o future so completa quando a rota sai da pilha), deixando a identidade em `_runs` e travando o proximo request com a mesma `key`. Agora a zona da execucao (`_detachKey`, em `stac_recovery_run.dart`) faz `StacService.onCallFromJson` iniciar sem aguardar as acoes de abertura (`_openingActions`) em qualquer nivel de aninhamento; `multiAction` fora de recuperacao nao muda. A ordem dentro de `multiAction` sync segue garantida (o `setState` conclui antes do `navigate` comecar). G6b, G7-B e "primeira emissao vence" inalterados.
+
 ## Task 5 — Chamadores, erro final e erro generico (MEDIO) — CONCLUIDA
 
 **Depende de:** T3 (pode rodar em paralelo a T4). **Atende:** Plano 5.4, 6, G6b, G8, G13, G14, R7.

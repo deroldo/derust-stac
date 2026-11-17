@@ -981,6 +981,150 @@ void main() {
     });
   });
 
+  group('opening actions nested in a hook or recover', () {
+    // A `multiAction` (sync) whose second step opens something that the
+    // recovery must not wait for: a pushAndRemoveAll never leaves the stack.
+    Map<String, dynamic> hookOf(String opening) => {
+      'actionType': 'multiAction',
+      'sync': true,
+      'actions': [
+        {
+          'actionType': 'setState',
+          'values': {'global.hook': 7},
+        },
+        if (opening == 'navigate')
+          {
+            'actionType': 'navigate',
+            'navigationStyle': 'pushAndRemoveAll',
+            'widgetJson': {'type': 'text', 'data': 'home'},
+          }
+        else
+          {
+            'actionType': 'showDialog',
+            'widget': {'type': 'text', 'data': 'dlg'},
+          },
+      ],
+    };
+
+    for (final result in ['onFailure', 'onUnavailable']) {
+      for (final opening in ['navigate', 'showDialog']) {
+        testWidgets('$result with a nested $opening ends the run', (
+          tester,
+        ) async {
+          final status = result == 'onFailure' ? 400 : 503;
+          var first = true;
+          server = (o) {
+            hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
+            if (o.uri.path == '/recover-endpoint') {
+              return first
+                  ? FakeResponse({'x': 1}, statusCode: status)
+                  : const FakeResponse({'token': 'new'});
+            }
+            return o.headers['X-Token'] == 'new'
+                ? const FakeResponse({'type': 'text', 'data': 'dest'})
+                : _envelope(
+                    _recovery(key: 'session', onFailure: null)
+                      ..[result] = hookOf(opening),
+                  );
+          };
+          final e = await load(tester) as StacRecoveryException;
+          await settle(tester);
+          expect(e.hookRan, isTrue);
+          expect(
+            result == 'onFailure' ? e.onFailureRan : e.onUnavailableRan,
+            isTrue,
+          );
+          expect(global('hook'), 7, reason: 'setState ran before opening');
+          expect(StacRecoveryInterceptor.instance.runsInFlight, 0);
+          expect(
+            find.text(opening == 'navigate' ? 'home' : 'dlg'),
+            findsOneWidget,
+            reason: 'opened exactly once',
+          );
+
+          // Same key again: a NEW recover must run and the request repeat.
+          first = false;
+          hits.clear();
+          await tester.pumpWidget(const SizedBox());
+          final again = await load(tester);
+          expect(hits['/recover-endpoint'], 1);
+          expect(again, isNot(isA<Exception>()));
+        });
+      }
+    }
+
+    testWidgets('a navigate nested in recover does not wait for timeoutMs', (
+      tester,
+    ) async {
+      server = (o) {
+        hits[o.uri.path] = (hits[o.uri.path] ?? 0) + 1;
+        return o.headers['X-Token'] == 'new'
+            ? const FakeResponse({'type': 'text', 'data': 'dest'})
+            : _envelope(
+                _recovery(
+                  timeoutMs: 60000,
+                  recover: {
+                    'actionType': 'multiAction',
+                    'sync': true,
+                    'actions': [
+                      {
+                        'actionType': 'setState',
+                        'values': {'global.tok': 'new'},
+                      },
+                      {
+                        'actionType': 'navigate',
+                        'navigationStyle': 'pushAndRemoveAll',
+                        'widgetJson': {'type': 'text', 'data': 'home'},
+                      },
+                    ],
+                  },
+                ),
+              );
+      };
+      // settle() inside load only advances 600 ms: far below timeoutMs.
+      final r = await load(tester);
+      expect(r, isNot(isA<Exception>()));
+      expect(StacRecoveryInterceptor.instance.runsInFlight, 0);
+    });
+
+    testWidgets('multiAction outside a recovery still awaits its steps', (
+      tester,
+    ) async {
+      var finished = false;
+      await pumpScreen(tester, [
+        _button('1', {
+          'actionType': 'multiAction',
+          'sync': true,
+          'actions': [
+            {'actionType': 'delay', 'milliseconds': 100},
+            {
+              'actionType': 'setState',
+              'values': {'global.hook': 3},
+            },
+          ],
+        }),
+      ]);
+      final context = tester.element(find.text('go1'));
+      final pending = StacService.onCallFromJson({
+        'actionType': 'multiAction',
+        'sync': true,
+        'actions': [
+          {'actionType': 'delay', 'milliseconds': 100},
+          {
+            'actionType': 'setState',
+            'values': {'global.hook': 3},
+          },
+        ],
+      }, context);
+      (pending as Future).then((_) => finished = true);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(finished, isFalse);
+      expect(global('hook'), isNot(3));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(global('hook'), 3);
+    });
+  });
+
   group('StacRecoveryRun', () {
     test('the first emission wins and none is taken outside a recovery', () {
       final run = StacRecoveryRun(

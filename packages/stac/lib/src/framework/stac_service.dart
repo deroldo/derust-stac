@@ -10,6 +10,7 @@ import 'package:stac/src/framework/stac_error.dart';
 import 'package:stac/src/framework/stac_network_view.dart';
 import 'package:stac/src/framework/stac_registry.dart';
 import 'package:stac/src/recovery/stac_recovery_exception.dart';
+import 'package:stac/src/recovery/stac_recovery_run.dart';
 import 'package:stac/src/recovery/stac_request_template.dart';
 import 'package:stac/src/models/stac_cache_config.dart';
 import 'package:stac/src/parsers/actions/stac_form_validate/stac_form_validate_parser.dart';
@@ -550,6 +551,11 @@ class StacService {
       }
 
       final model = stacActionParser.getModel(resolvedJson);
+      if (stacDetachesOpening(actionType)) {
+        // Inside a recovery (`recover` / hooks) what opens a route, dialog or
+        // sheet is started, not awaited, at any nesting level.
+        return stacDetach(stacActionParser.onCall(context, model));
+      }
       if (actionType == ActionType.networkRequest.name) {
         // The request keeps its unresolved JSON (a template to send it again
         // with bindings re-evaluated); see StacRequestTemplate.

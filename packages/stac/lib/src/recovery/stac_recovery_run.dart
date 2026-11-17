@@ -44,6 +44,32 @@ const Set<String> _openingActions = {
   'showModalBottomSheet',
 };
 
+const Symbol _detachKey = #stacRecoveryDetachOpening;
+
+/// Whether an action of [actionType] called right now must be started and
+/// not awaited: it opens something (route, dialog, sheet) whose future only
+/// completes when it is closed, and we are inside the `recover` / hook of a
+/// recovery. Holds at any nesting level (e.g. inside a `multiAction`), so a
+/// `pushAndRemoveAll` can never keep the run, and its identity, open.
+bool stacDetachesOpening(String actionType) =>
+    Zone.current[_detachKey] == true && _openingActions.contains(actionType);
+
+/// Detaches [pending] (see [stacDetachesOpening]): logs its failure and
+/// returns `null` so the caller goes on.
+Object? stacDetach(Object? pending) {
+  if (pending is Future) {
+    unawaited(
+      pending.then<void>(
+        (_) {},
+        onError: (Object e) => Log.e(
+          StacGlobalState.instance.redact('recovery action failed: $e'),
+        ),
+      ),
+    );
+  }
+  return null;
+}
+
 /// Runs [fn] so that requests it makes are no longer *direct* requests of the
 /// current recovery (they belong to a callback such as `onSuccess`). Outside a
 /// recovery it just calls [fn].
@@ -299,41 +325,31 @@ class StacRecoveryRun {
       'request': _requestVars(who.options),
       'failure': _failureVars(who.error),
     };
-    Future<void> body() => runWithStacActionVars<void>(vars, () async {
-      final list = actions is List ? actions : [actions];
-      final context = scope.origin;
-      for (final action in list) {
-        if (action is! Map) {
-          Log.e(
-            StacGlobalState.instance.redact(
-              'recovery expects actions, got $action',
-            ),
-          );
-          continue;
-        }
-        final json = Map<String, dynamic>.from(action);
-        final type = json['actionType'];
-        if (!context.mounted && _needsMountedScreen.contains(type)) {
-          Log.w('recovery: action "$type" skipped (its screen is gone)');
-          continue;
-        }
-        if (_openingActions.contains(type)) {
-          final pending = StacService.onCallFromJson(json, context);
-          if (pending is Future) {
-            unawaited(
-              pending.then<void>(
-                (_) {},
-                onError: (Object e) => Log.e(
-                  StacGlobalState.instance.redact('recovery action failed: $e'),
-                ),
+    Future<void> body() => runZoned(
+      () => runWithStacActionVars<void>(vars, () async {
+        final list = actions is List ? actions : [actions];
+        final context = scope.origin;
+        for (final action in list) {
+          if (action is! Map) {
+            Log.e(
+              StacGlobalState.instance.redact(
+                'recovery expects actions, got $action',
               ),
             );
+            continue;
           }
-        } else {
+          final json = Map<String, dynamic>.from(action);
+          final type = json['actionType'];
+          if (!context.mounted && _needsMountedScreen.contains(type)) {
+            Log.w('recovery: action "$type" skipped (its screen is gone)');
+            continue;
+          }
+          // Opening actions are detached by StacService.onCallFromJson (zone).
           await StacService.onCallFromJson(json, context);
         }
-      }
-    });
+      }),
+      zoneValues: {_detachKey: true},
+    );
     return runWithStacCapturedScope<void>(
       scope,
       () => runExempt<void>(
