@@ -1,0 +1,63 @@
+---
+title: "Recovery Outcome Action"
+description: "Documentation for Recovery Outcome Action"
+---
+
+The `StacRecoveryOutcome` action reports the result of the recovery that is currently running. It is meant for the `recover` actions of a `recovery` instruction in a [server error envelope](/concepts/error_recovery). The first one emitted wins.
+
+Outside a recovery (or inside `onFailure` / `onUnavailable`) it is logged and ignored.
+
+## Properties
+
+| Property | Type                         | Description                                                                 |
+|----------|------------------------------|-----------------------------------------------------------------------------|
+| result   | `StacRecoveryOutcomeResult`  | The result of the recovery: `success`, `failure` or `unavailable`.          |
+
+### Result
+
+| Value         | Effect                                                                          |
+|---------------|---------------------------------------------------------------------------------|
+| `success`     | The recovery worked: the original request is repeated once.                     |
+| `failure`     | The recovery failed: `onFailure` runs once and the request is not repeated.     |
+| `unavailable` | The recovery could not be done now: `onUnavailable` runs and nothing is repeated. |
+
+If no `recoveryOutcome` is emitted, the result is deduced from the requests that `recover` makes directly: a 5xx, a timeout or a network error is `unavailable`; otherwise a 4xx is `failure`; otherwise `success`. An exception in `recover` is `failure`. The `timeoutMs` of the instruction (20 seconds by default) makes the result `unavailable`.
+
+## Example
+
+<CodeGroup>
+```dart Dart
+StacRecoveryOutcome(
+  result: StacRecoveryOutcomeResult.failure,
+)
+```
+
+```json JSON
+{
+  "actionType": "recoveryOutcome",
+  "result": "failure"
+}
+```
+</CodeGroup>
+
+## Emitting an outcome from `recover`
+
+Place it after the requests of `recover` to decide the result explicitly instead of relying on the deduction. The first one emitted wins; use the usual `condition` field of an action to emit it only when a check holds:
+
+```json
+{
+  "recover": [
+    {
+      "actionType": "networkRequest",
+      "url": "https://api.example.com/<resource>",
+      "method": "post"
+    },
+    { "actionType": "recoveryOutcome", "result": "unavailable", "condition": "{{someCheck}}" },
+    { "actionType": "recoveryOutcome", "result": "success" }
+  ]
+}
+```
+
+<Note>
+See [Error recovery and repetition](/concepts/error_recovery) for the full envelope contract.
+</Note>

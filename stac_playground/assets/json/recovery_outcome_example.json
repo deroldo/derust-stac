@@ -1,0 +1,38 @@
+{
+  "type": "scaffold",
+  "appBar": {
+    "type": "appBar",
+    "title": {
+      "type": "text",
+      "data": "Recovery Outcome"
+    }
+  },
+  "body": {
+    "type": "center",
+    "child": {
+      "type": "column",
+      "mainAxisAlignment": "center",
+      "children": [
+        {
+          "type": "text",
+          "data": "Reports success, failure or unavailable"
+        },
+        {
+          "type": "sizedBox",
+          "height": 16
+        },
+        {
+          "type": "elevatedButton",
+          "onPressed": {
+            "actionType": "recoveryOutcome",
+            "result": "failure"
+          },
+          "child": {
+            "type": "text",
+            "data": "Emit failure"
+          }
+        }
+      ]
+    }
+  }
+}

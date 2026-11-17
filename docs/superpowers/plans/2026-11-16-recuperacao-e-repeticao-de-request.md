@@ -174,21 +174,21 @@ Contexto de codigo (ler antes de qualquer tarefa): `packages/stac/lib/src/servic
 
 ---
 
-## Task 8 — Docs e playground (MEDIO)
+## Task 8 — Docs e playground (MEDIO) — CONCLUIDA exceto a pagina do StacRouter (depende da T6)
 
 **Depende de:** T4, T5 (parte de router depende de T6). **Atende:** Plano 10 T8.
 
-- [ ] `docs/concepts/` (ingles, Mintlify): pagina de recuperacao e erro (contrato do envelope v1, reconhecimento, `recover`/`retry`/`onFailure`/`onUnavailable`, `recoveryOutcome`, coalescencia, isencao, G7-B, erro final, `genericErrorBuilder`); `docs/actions/recovery_outcome.mdx` no formato de `docs/actions/set_value.mdx`; pagina do `StacRouter` apos T6; navegacao em `docs/docs.json`.
-- [ ] `stac_playground`: DSL + JSON + entrada em `lib/data/component_entries.dart` para `recoveryOutcome`; manter `dsl_to_json.dart` e `test/dsl_to_json_test.dart` em sincronia (`cd stac_playground && flutter test`, `flutter build web`).
-- [ ] Exemplo do envelope generico (nao o do Tapbook) como referencia.
+- [x] `docs/concepts (exceto pagina do StacRouter, pendente da T6)/` (ingles, Mintlify): pagina de recuperacao e erro (contrato do envelope v1, reconhecimento, `recover`/`retry`/`onFailure`/`onUnavailable`, `recoveryOutcome`, coalescencia, isencao, G7-B, erro final, `genericErrorBuilder`); `docs/actions/recovery_outcome.mdx` no formato de `docs/actions/set_value.mdx`; pagina do `StacRouter` apos T6; navegacao em `docs/docs.json`.
+- [x] `stac_playground`: DSL + JSON + entrada em `lib/data/component_entries.dart` para `recoveryOutcome`; manter `dsl_to_json.dart` e `test/dsl_to_json_test.dart` em sincronia (`cd stac_playground && flutter test`, `flutter build web`).
+- [x] Exemplo do envelope generico (nao o do Tapbook) como referencia.
 
 ---
 
-## Task 10 — Harness de compatibilidade do envelope (MEDIO)
+## Task 10 — Harness de compatibilidade do envelope (MEDIO) — CONCLUIDA
 
 **Depende de:** T4. **Atende:** Plano 10 T10, restrito a este repo.
 
-- [ ] Fixtures JSON do envelope e da instrucao em `packages/stac/test/recovery/fixtures/` (as mesmas que o derust deve produzir: marcador, `version`, `recovery` completo, `screen`-so, `action`-so, versao desconhecida) e teste que as parseia com o runtime real (reconhecedor + modelos + `recoveryOutcome` via parser) e executa um ciclo completo 401 -> recover -> repeticao. Documentar em `docs/` onde o repo derust deve consumir as mesmas fixtures (T9 fora de escopo).
+- [x] Fixtures JSON do envelope e da instrucao em `packages/stac/test/recovery/fixtures/` (as mesmas que o derust deve produzir: marcador, `version`, `recovery` completo, `screen`-so, `action`-so, versao desconhecida) e teste que as parseia com o runtime real (reconhecedor + modelos + `recoveryOutcome` via parser) e executa um ciclo completo 401 -> recover -> repeticao. Documentar em `docs/` onde o repo derust deve consumir as mesmas fixtures (T9 fora de escopo).
 
 ---
 

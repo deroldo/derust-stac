@@ -48,6 +48,7 @@
                             "concepts/reactivity",
                             "concepts/state_reference",
                             "concepts/caching",
+                            "concepts/error_recovery",
                             "concepts/custom_widgets",
                             "concepts/custom_actions",
                             "concepts/theming"
@@ -207,7 +208,8 @@
                         "group": "Network Actions",
                         "pages": [
                             "actions/network_request",
-                            "actions/cancel_request"
+                            "actions/cancel_request",
+                            "actions/recovery_outcome"
                         ]
                     },
                     {

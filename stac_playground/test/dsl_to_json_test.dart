@@ -101,6 +101,7 @@ void main() {
       'padding',
       'page_view',
       'placeholder',
+      'recovery_outcome',
       'row',
       'scaffold',
       'scroll_view',

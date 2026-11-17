@@ -1,0 +1,147 @@
+---
+title: "Error Recovery and Repetition"
+description: "Let the server tell the app how to recover from a failed request and repeat it once"
+---
+
+When a request fails, the server can answer with an **error envelope** that carries instructions. The app follows them: it runs a recovery (any Stac actions), repeats the original request once, and shows a proper error when nothing works. The framework has no knowledge of what the recovery means (authentication, maintenance, quota...); it only executes what the server sends. There is no recovery configuration in the app and no list of statuses to match.
+
+Without an envelope in any response, nothing changes.
+
+## The error envelope (v1)
+
+A response is treated as an envelope only when **all** of these hold:
+
+- the status is not 2xx (an envelope in a 2xx response is ignored);
+- `Content-Type` is `application/vnd.stac.error+json` (parameters such as `charset` are accepted);
+- the body is a JSON object;
+- `version` is an integer the app supports (currently `1`).
+
+Anything else is a regular error, logged, and nothing is executed. A body in another format (for example RFC 7807 without the marker) is never mistaken for an envelope. Errors without a response (network failure, timeout) are never recovered.
+
+```http
+HTTP/1.1 4xx
+Content-Type: application/vnd.stac.error+json
+```
+
+```json
+{
+  "version": 1,
+  "code": "needs_recovery",
+  "message": "Human readable text",
+  "screen": { "type": "text", "data": "Something went wrong" },
+  "action": { "actionType": "showSnackBar", "content": { "type": "text", "data": "Failed" } },
+  "recovery": {
+    "key": "recovery-a",
+    "recover": [
+      {
+        "actionType": "networkRequest",
+        "url": "https://api.example.com/<resource>",
+        "method": "post",
+        "body": { "url": "{{request.url}}" }
+      }
+    ],
+    "retry": {
+      "overrides": {
+        "headers": { "X-Hint": "{{someStateKey}}" },
+        "queryParameters": { "page": "2" },
+        "body": { "field": "value" }
+      },
+      "removeHeaders": ["X-Obsolete"]
+    },
+    "onFailure": { "actionType": "navigate", "routeName": "/somewhere" },
+    "onUnavailable": { "actionType": "showSnackBar", "content": { "type": "text", "data": "Try again later" } },
+    "timeoutMs": 20000
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `version` | Integer, required. |
+| `code`, `message` | Optional strings, available to bindings as `failure.code` and `failure.message`. |
+| `screen` | A Stac widget shown as the final error (see [rendering order](#final-error-and-rendering-order)). |
+| `action` | A Stac action that runs after the caller's `onError`. |
+| `recovery` | The recovery instruction. Without it the envelope only carries `screen`/`action`. |
+
+## The recovery instruction
+
+| Field | Description |
+|-------|-------------|
+| `recover` | An action or a list of actions. Runs once, in the screen of the first request that is still alive. It can call any endpoint of the server with `networkRequest`. |
+| `retry` | How the original request changes on its single repetition: `overrides.headers`, `overrides.queryParameters`, `overrides.body` (a `null` value removes the key; a map body is merged by key) and `removeHeaders`. Values accept bindings, evaluated when the repetition happens. URL and method never change. |
+| `onFailure` | Action(s) that run once when the recovery fails. |
+| `onUnavailable` | Action(s) that run when the recovery could not be done now. |
+| `key` | Coalescing key (see below). |
+| `timeoutMs` | Time limit of the recovery. Defaults to 20 seconds; reaching it is `unavailable`. |
+
+### The recovery result
+
+The result is `success`, `failure` or `unavailable`:
+
+- `success`: the original request is repeated once, with the `retry` overrides.
+- `failure`: `onFailure` runs once; no repetition.
+- `unavailable`: `onUnavailable` runs; no repetition.
+
+Emit it explicitly with the [`recoveryOutcome`](/actions/recovery_outcome) action (the first one emitted wins, and it accepts a condition through the usual action mechanisms). Without one, the result is deduced from the requests `recover` makes directly: a 5xx, a timeout or a network error is `unavailable`; otherwise a 4xx is `failure`; otherwise `success`. An exception in `recover` is `failure`.
+
+### Variables: `request` and `failure`
+
+Bindings inside `recover`, `onFailure` and `onUnavailable` can read two read-only variables:
+
+- `request`: the failed request: `method`, `url`, `path`, `queryParameters`, `headers` and `body` (only when the body is JSON-like).
+- `failure`: the response that started the recovery: `statusCode`, `body`, `headers`, `code` and `message`.
+
+Values read from them are redacted in logs.
+
+## Coalescing by key
+
+Several requests can fail at the same time with the same instruction. They share **one** recovery run and each one then repeats **its own** request.
+
+- The identity is `key`. When `key` is absent it is a hash of the canonical JSON of `recover`.
+- `"key": null` turns coalescing off: every failing request runs its own recovery.
+- A request that started before a recovery succeeded and fails afterwards only repeats; it does not recover again.
+
+## Exemptions and safeguards
+
+- The repetition, the requests made by `recover` and the requests emitted by `onFailure` / `onUnavailable` are **exempt**: an envelope in their responses is never recovered. This prevents loops.
+- A request is repeated **once**. If the repetition fails, that is the final error.
+- The recovery belongs to the current request. If its screen is discarded or the request is cancelled, the recovery stops: it does not repeat and `onFailure` does not run for it. If the screen that started the run disappears, `recover` continues in another request that is still alive; actions that need a mounted screen are skipped with a log.
+- `onFailure` runs once per run, in the scope of the first request still alive. If none is alive, nothing runs.
+
+## Final error and rendering order
+
+When the request cannot be recovered or the repetition fails, widgets that load from the network (`networkWidget`, `navigate`/`showDialog`/`showModalBottomSheet` with a `request`) render the error in this order:
+
+1. If `onFailure`/`onUnavailable` ran, the caller renders **nothing**: the server already took over. The final error stays available as `response` in `onError`.
+2. The `screen` of the (final) envelope.
+3. The `errorWidget` of the caller, when set.
+4. `Stac.genericErrorBuilder`, or a built-in minimal widget (an icon and "Could not load").
+
+An envelope with only `action` shows nothing and runs the action after `onError`; it does not run if `onFailure` ran.
+
+For a `networkRequest` action the order of callbacks is: `onSuccess` only after the repetition (never for the intermediate failure); on error one `onError` with the final response, then `onFinally`, then the envelope `action`.
+
+### `genericErrorBuilder`
+
+Replace or disable the built-in error widget in `Stac.initialize`:
+
+```dart
+await Stac.initialize(
+  genericErrorBuilder: (context, error) => const Center(
+    child: Text('Something went wrong'),
+  ),
+);
+
+// Show nothing instead of the built-in widget.
+await Stac.initialize(genericErrorBuilder: (_, __) => const SizedBox());
+```
+
+## Limitations
+
+- The request body must be reusable. A stream or `FormData` cannot be sent twice: such a request is not recovered and a clear log is written.
+- Only one repetition per request, for any HTTP verb.
+- Requests made with the app's own `Dio` are recovered too, but they are repeated from their original options plus the `retry` overrides.
+
+<Note>
+The recovery calls whatever the server asks for; the framework does not know routes, headers or what a given failure means.
+</Note>

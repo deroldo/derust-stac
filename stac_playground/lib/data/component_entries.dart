@@ -815,4 +815,14 @@ const List<PlaygroundEntry> componentEntries = [
     iconType: 'material',
     category: EntryCategory.component,
   ),
+  PlaygroundEntry(
+    id: 'recovery_outcome',
+    title: 'Stac Recovery Outcome',
+    description: 'Reports the result of a server-driven recovery',
+    jsonAsset: 'assets/json/recovery_outcome_example.json',
+    dartAsset: 'lib/dsl/recovery_outcome.dart',
+    icon: 'sync',
+    iconType: 'material',
+    category: EntryCategory.component,
+  ),
 ];
